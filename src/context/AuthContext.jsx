@@ -18,8 +18,8 @@ export const AuthProvider = ({ children }) => {
 
   // --- MOCK USERS ---
   const mockUsers = [
-    { email: "admin@meraki.com", uid: "uid_admin", nombre: "Administradora Meraki", rol: "administrador" },
-    { email: "joshua@meraki.com", uid: "uid_joshua", nombre: "Joshua (Recepción)", rol: "recepcionista" }
+    { email: "jeni@gmail.com", uid: "uid_admin", nombre: "Administradora Meraki (Jeni)", rol: "administrador" },
+    { email: "joshua@gmail.com", uid: "uid_joshua", nombre: "Joshua (Recepción)", rol: "recepcionista" }
   ];
 
   useEffect(() => {
@@ -85,13 +85,13 @@ export const AuthProvider = ({ children }) => {
       // Simulación de login en modo local
       return new Promise((resolve, reject) => {
         setTimeout(() => {
-          const user = mockUsers.find(u => u.email === email && password === (email.includes("admin") ? "admin123" : "joshua123"));
+          const user = mockUsers.find(u => u.email === email && password === (email.includes("jeni") ? "jeni2026" : "joshua2026"));
           if (user) {
             localStorage.setItem("meraki_logged_user", JSON.stringify(user));
             setCurrentUser(user);
             resolve(user);
           } else {
-            reject(new Error("Usuario o contraseña incorrectos. Usa admin@meraki.com (clave: admin123) o joshua@meraki.com (clave: joshua123)"));
+            reject(new Error("Usuario o contraseña incorrectos. Usa jeni@gmail.com (clave: jeni2026) o joshua@gmail.com (clave: joshua2026)"));
           }
         }, 800);
       });

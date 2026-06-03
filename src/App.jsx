@@ -23,8 +23,8 @@ import "./App.css";
 // 1. LOGIN COMPONENT
 function LoginScreen() {
   const { login } = useAuth();
-  const [email, setEmail] = useState("joshua@meraki.com"); // default prefill for easy demo
-  const [password, setPassword] = useState("joshua123");
+  const [email, setEmail] = useState("joshua@gmail.com"); // default prefill for easy demo
+  const [password, setPassword] = useState("joshua2026");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
