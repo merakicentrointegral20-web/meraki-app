@@ -4,12 +4,12 @@ import { getFirestore } from "firebase/firestore";
 
 // Coloca aquí tus credenciales de Firebase cuando las tengas listas.
 const firebaseConfig = {
-  apiKey: "REPLACE_WITH_YOUR_KEY",
-  authDomain: "REPLACE_WITH_YOUR_DOMAIN",
-  projectId: "REPLACE_WITH_YOUR_PROJECT_ID",
-  storageBucket: "REPLACE_WITH_YOUR_BUCKET",
-  messagingSenderId: "REPLACE_WITH_YOUR_SENDER_ID",
-  appId: "REPLACE_WITH_YOUR_APP_ID"
+  apiKey: "AIzaSyCFMYfRGiLPSQg5jr0SwWsF-oHnMwQZSok",
+  authDomain: "meraki-aplicacion.firebaseapp.com",
+  projectId: "meraki-aplicacion",
+  storageBucket: "meraki-aplicacion.firebasestorage.app",
+  messagingSenderId: "241299454474",
+  appId: "1:241299454474:web:9776666f681f3de5afbdf3"
 };
 
 // Verificar si las credenciales son reales o son los placeholders
