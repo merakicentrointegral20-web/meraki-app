@@ -13,8 +13,15 @@ export default function PacientesApp() {
   
   // Forms
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [newPaciente, setNewPaciente] = useState({
+    id: "", nombre: "", fechaNacimiento: "", representante: "", cedulaRepresentante: "",
+    telefono: "", telefonoEmergencia: "", ciudad: "", terapeutaAsignadoId: "",
+    requiereFactura: false,
+    datosFacturacion: { ruc: "", nombre: "", correo: "", direccion: "", telefono: "" }
+  });
+  const [editPaciente, setEditPaciente] = useState({
     id: "", nombre: "", fechaNacimiento: "", representante: "", cedulaRepresentante: "",
     telefono: "", telefonoEmergencia: "", ciudad: "", terapeutaAsignadoId: "",
     requiereFactura: false,
@@ -80,6 +87,67 @@ export default function PacientesApp() {
     } catch (e) {
       console.error(e);
       alert("Error al registrar paciente.");
+    }
+  };
+
+  const handleOpenEditModal = (paciente) => {
+    setEditPaciente({
+      id: paciente.id,
+      nombre: paciente.nombre || "",
+      fechaNacimiento: paciente.fechaNacimiento || "",
+      representante: paciente.representante || "",
+      cedulaRepresentante: paciente.cedulaRepresentante || "",
+      telefono: paciente.telefono || "",
+      telefonoEmergencia: paciente.telefonoEmergencia || "",
+      ciudad: paciente.ciudad || "",
+      terapeutaAsignadoId: paciente.terapeutaAsignadoId || "",
+      requiereFactura: paciente.requiereFactura || false,
+      datosFacturacion: {
+        ruc: paciente.datosFacturacion?.ruc || "",
+        nombre: paciente.datosFacturacion?.nombre || "",
+        correo: paciente.datosFacturacion?.correo || "",
+        direccion: paciente.datosFacturacion?.direccion || "",
+        telefono: paciente.datosFacturacion?.telefono || ""
+      }
+    });
+    setShowEditForm(true);
+  };
+
+  const handleEditPaciente = async (e) => {
+    e.preventDefault();
+    if (!editPaciente.nombre) {
+      alert("El nombre es obligatorio.");
+      return;
+    }
+    try {
+      const updatedFields = {
+        nombre: editPaciente.nombre,
+        fechaNacimiento: editPaciente.fechaNacimiento,
+        representante: editPaciente.representante,
+        cedulaRepresentante: editPaciente.cedulaRepresentante,
+        telefono: editPaciente.telefono,
+        telefonoEmergencia: editPaciente.telefonoEmergencia,
+        ciudad: editPaciente.ciudad,
+        terapeutaAsignadoId: editPaciente.terapeutaAsignadoId,
+        requiereFactura: editPaciente.requiereFactura,
+        datosFacturacion: editPaciente.requiereFactura ? editPaciente.datosFacturacion : { ruc: "", nombre: "", correo: "", direccion: "", telefono: "" }
+      };
+
+      await updateDocument("pacientes", editPaciente.id, updatedFields);
+      
+      // Update selected patient local state if it's the one currently open
+      if (selectedPaciente?.id === editPaciente.id) {
+        setSelectedPaciente(prev => ({
+          ...prev,
+          ...updatedFields
+        }));
+      }
+
+      setShowEditForm(false);
+      alert("Paciente actualizado correctamente.");
+    } catch (err) {
+      console.error(err);
+      alert("Error al actualizar paciente.");
     }
   };
 
@@ -258,9 +326,18 @@ export default function PacientesApp() {
                 <h3 style={{ color: "var(--text-main)", fontWeight: 600 }}>{selectedPaciente.nombre}</h3>
                 <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>C.I: {selectedPaciente.id}</span>
               </div>
-              <button style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-muted)" }} onClick={() => setSelectedPaciente(null)}>
-                <X size={20} />
-              </button>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ padding: "6px 10px", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "6px" }}
+                  onClick={() => handleOpenEditModal(selectedPaciente)}
+                >
+                  <Edit2 size={14} /> Editar
+                </button>
+                <button style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-muted)", padding: "4px" }} onClick={() => setSelectedPaciente(null)}>
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {checkBlacklist(selectedPaciente) && (
@@ -462,6 +539,86 @@ export default function PacientesApp() {
                 <button className="btn btn-danger" onClick={handleDeactivate}>Confirmar Suspensión</button>
               </div>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Edit Paciente */}
+      {showEditForm && createPortal(
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}>
+          <div className="glass fade-in" style={{ padding: "24px", borderRadius: "var(--radius-md)", width: "600px", maxWidth: "90%", maxHeight: "90vh", overflowY: "auto", boxShadow: "var(--shadow-lg)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 style={{ fontWeight: 600, color: "var(--purple-dark)" }}>Editar Ficha del Paciente</h3>
+              <button style={{ border: "none", background: "none", cursor: "pointer" }} onClick={() => setShowEditForm(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleEditPaciente} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Cédula del Niño (No editable)*</label>
+                  <input type="text" disabled className="input-field" style={{ backgroundColor: "#F3F4F6", cursor: "not-allowed" }} value={editPaciente.id} />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Nombre del Niño*</label>
+                  <input type="text" required className="input-field" value={editPaciente.nombre} onChange={(e) => setEditPaciente({...editPaciente, nombre: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Fecha de Nacimiento*</label>
+                  <input type="date" required className="input-field" value={editPaciente.fechaNacimiento} onChange={(e) => setEditPaciente({...editPaciente, fechaNacimiento: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Ciudad*</label>
+                  <input type="text" required className="input-field" value={editPaciente.ciudad} onChange={(e) => setEditPaciente({...editPaciente, ciudad: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Nombre Representante*</label>
+                  <input type="text" required className="input-field" value={editPaciente.representante} onChange={(e) => setEditPaciente({...editPaciente, representante: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Cédula Representante*</label>
+                  <input type="text" required className="input-field" value={editPaciente.cedulaRepresentante} onChange={(e) => setEditPaciente({...editPaciente, cedulaRepresentante: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Teléfono*</label>
+                  <input type="text" required className="input-field" value={editPaciente.telefono} onChange={(e) => setEditPaciente({...editPaciente, telefono: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Teléfono de Emergencia*</label>
+                  <input type="text" required className="input-field" value={editPaciente.telefonoEmergencia} onChange={(e) => setEditPaciente({...editPaciente, telefonoEmergencia: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Terapeuta Asignado*</label>
+                  <select required className="input-field" value={editPaciente.terapeutaAsignadoId} onChange={(e) => setEditPaciente({...editPaciente, terapeutaAsignadoId: e.target.value})}>
+                    <option value="">Seleccione...</option>
+                    {terapeutas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "16px" }}>
+                  <input type="checkbox" id="editReqFactura" checked={editPaciente.requiereFactura} onChange={(e) => setEditPaciente({...editPaciente, requiereFactura: e.target.checked})} />
+                  <label htmlFor="editReqFactura" style={{ fontSize: "0.85rem", fontWeight: 500 }}>¿Requiere Factura?</label>
+                </div>
+              </div>
+ 
+              {editPaciente.requiereFactura && (
+                <div style={{ border: "1px solid var(--purple-pastel-soft)", padding: "12px", borderRadius: "var(--radius-sm)", backgroundColor: "var(--purple-light)" }}>
+                  <h4 style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--purple-dark)", marginBottom: "8px" }}>Datos de Facturación</h4>
+                  <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                    <input type="text" placeholder="RUC / Cédula" className="input-field" value={editPaciente.datosFacturacion.ruc} onChange={(e) => setEditPaciente({...editPaciente, datosFacturacion: {...editPaciente.datosFacturacion, ruc: e.target.value}})} />
+                    <input type="text" placeholder="Nombre en Factura" className="input-field" value={editPaciente.datosFacturacion.nombre} onChange={(e) => setEditPaciente({...editPaciente, datosFacturacion: {...editPaciente.datosFacturacion, nombre: e.target.value}})} />
+                    <input type="email" placeholder="Correo" className="input-field" value={editPaciente.datosFacturacion.correo} onChange={(e) => setEditPaciente({...editPaciente, datosFacturacion: {...editPaciente.datosFacturacion, correo: e.target.value}})} />
+                    <input type="text" placeholder="Dirección" className="input-field" value={editPaciente.datosFacturacion.direccion} onChange={(e) => setEditPaciente({...editPaciente, datosFacturacion: {...editPaciente.datosFacturacion, direccion: e.target.value}})} />
+                  </div>
+                </div>
+              )}
+ 
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditForm(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary">Guardar Cambios</button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body

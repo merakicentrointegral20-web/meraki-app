@@ -256,4 +256,72 @@ button, input, select, textarea {
   to { transform: rotate(360deg); }
 }
 
+/* Print styles for a clean commission report voucher */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt !important;
+  }
+
+  /* Hide navigation, filter inputs, buttons, header/footer elements */
+  header, 
+  footer, 
+  button, 
+  .btn,
+  .input-field, 
+  select, 
+  label,
+  .glass:not(.print-area) {
+    display: none !important;
+  }
+
+  /* Reset outer layout wrappers to let the printable content expand fully */
+  #root, 
+  main, 
+  .fade-in, 
+  div[style*="padding: 20px"] {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    display: block !important;
+  }
+
+  /* Optimize print area container */
+  .print-area {
+    display: block !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Expand detailed breakdown tables to full page print width */
+  .responsive-table-wrap {
+    overflow: visible !important;
+    width: 100% !important;
+    margin-top: 20px !important;
+  }
+
+  .responsive-table-wrap table {
+    min-width: 100% !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  .responsive-table-wrap th,
+  .responsive-table-wrap td {
+    border-bottom: 1px solid #E5E7EB !important;
+    color: #000000 !important;
+    padding: 8px !important;
+  }
+}
+
 

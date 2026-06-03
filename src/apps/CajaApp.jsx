@@ -36,6 +36,14 @@ export default function CajaApp() {
     verificado: false, facturado: false
   });
 
+  // Abono modal for Cuentas por Cobrar
+  const [showAbonoModal, setShowAbonoModal] = useState(false);
+  const [selectedDeuda, setSelectedDeuda] = useState(null);
+  const [abonoForm, setAbonoForm] = useState({
+    monto: "", tipo: "efectivo", banco: "", comprobante: "",
+    verificado: false, facturado: false
+  });
+
   useEffect(() => {
     const today = new Date();
     setTargetDate(today.toISOString().split('T')[0]);
@@ -168,6 +176,45 @@ export default function CajaApp() {
     } catch (e) {
       console.error(e);
       alert("Error al registrar pago.");
+    }
+  };
+
+  const handleOpenAbonoModal = (deuda) => {
+    setSelectedDeuda(deuda);
+    setAbonoForm({
+      monto: Number(deuda.saldoDebe),
+      tipo: "efectivo",
+      banco: "",
+      comprobante: "",
+      verificado: false,
+      facturado: false
+    });
+    setShowAbonoModal(true);
+  };
+
+  const handleRegisterAbono = async (e) => {
+    e.preventDefault();
+    if (!selectedDeuda) return;
+
+    try {
+      const transData = {
+        representanteId: selectedDeuda.repId,
+        pacienteNombre: selectedDeuda.pacienteNombre,
+        monto: Number(abonoForm.monto),
+        tipo: abonoForm.tipo,
+        banco: abonoForm.tipo !== "efectivo" ? abonoForm.banco : "",
+        comprobante: abonoForm.tipo !== "efectivo" ? abonoForm.comprobante : "",
+        fechaRegistro: new Date().toISOString(),
+        verificado: abonoForm.tipo === "efectivo" ? true : false, // Cash is auto-verified
+        facturado: abonoForm.facturado
+      };
+
+      await addDocument("transacciones", transData);
+      setShowAbonoModal(false);
+      alert("Abono / Pago registrado correctamente.");
+    } catch (err) {
+      console.error(err);
+      alert("Error al registrar el abono/pago.");
     }
   };
 
@@ -488,6 +535,7 @@ export default function CajaApp() {
                 <th style={{ padding: "12px 8px" }}>TOTAL CARGOS</th>
                 <th style={{ padding: "12px 8px" }}>TOTAL ABONADO</th>
                 <th style={{ padding: "12px 8px" }}>DEUDA PENDIENTE</th>
+                <th style={{ padding: "12px 8px", textAlign: "right" }}>ACCIÓN</th>
               </tr>
             </thead>
             <tbody>
@@ -500,11 +548,20 @@ export default function CajaApp() {
                   <td style={{ padding: "12px 8px" }}>${d.totalCargos}</td>
                   <td style={{ padding: "12px 8px" }}>${d.totalAbonado}</td>
                   <td style={{ padding: "12px 8px", fontWeight: 600, color: "var(--pink-base)" }}>${d.saldoDebe}</td>
+                  <td style={{ padding: "12px 8px", textAlign: "right" }}>
+                    <button 
+                      className="btn btn-primary"
+                      style={{ padding: "6px 12px", fontSize: "0.8rem" }}
+                      onClick={() => handleOpenAbonoModal(d)}
+                    >
+                      Registrar Pago
+                    </button>
+                  </td>
                 </tr>
               ))}
               {deudasRep.length === 0 && (
                 <tr>
-                  <td colSpan="7" style={{ padding: "30px", textAlign: "center", color: "var(--text-muted)" }}>No hay representantes en mora. ¡Caja al día!</td>
+                  <td colSpan="8" style={{ padding: "30px", textAlign: "center", color: "var(--text-muted)" }}>No hay representantes en mora. ¡Caja al día!</td>
                 </tr>
               )}
             </tbody>
@@ -771,6 +828,118 @@ export default function CajaApp() {
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowPayModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary">Registrar Ingreso</button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showAbonoModal && selectedDeuda && createPortal(
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}>
+          <div className="glass fade-in" style={{ padding: "24px", borderRadius: "var(--radius-md)", width: "450px", maxWidth: "90%", boxShadow: "var(--shadow-lg)" }}>
+            <h3 style={{ fontWeight: 600, color: "var(--purple-dark)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <DollarSign size={20} /> Registrar Pago / Abono
+            </h3>
+            
+            <form onSubmit={handleRegisterAbono} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div style={{ fontSize: "0.9rem", backgroundColor: "var(--purple-light)", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--purple-pastel-soft)" }}>
+                <strong>Representante:</strong> {selectedDeuda.representante}<br />
+                <strong>Cédula:</strong> {selectedDeuda.repId}<br />
+                <strong>Paciente:</strong> {selectedDeuda.pacienteNombre}<br />
+                <strong>Deuda Pendiente:</strong> ${selectedDeuda.saldoDebe}
+              </div>
+
+              {/* Check if patient requires invoice */}
+              {(() => {
+                const pat = pacientes.find(p => p.cedulaRepresentante === selectedDeuda.repId || p.id === selectedDeuda.repId);
+                if (pat?.requiereFactura) {
+                  const invoiceData = `RUC: ${pat.datosFacturacion?.ruc || ""}\nNombre: ${pat.datosFacturacion?.nombre || ""}\nDirección: ${pat.datosFacturacion?.direccion || ""}\nCorreo: ${pat.datosFacturacion?.correo || ""}`;
+                  return (
+                    <div style={{ backgroundColor: "#FDF2F8", border: "1px solid var(--pink-pastel-soft)", color: "var(--pink-dark)", padding: "10px", borderRadius: "var(--radius-sm)", fontSize: "0.8rem", display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center", fontWeight: "bold" }}>
+                        <FileText size={16} /> CLIENTE REQUIERE FACTURA (SRI)
+                      </div>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        style={{ padding: "4px 8px", fontSize: "0.75rem", justifyContent: "center" }}
+                        onClick={() => copyToClipboard(invoiceData)}
+                      >
+                        <Copy size={12} /> Copiar datos de Factura
+                      </button>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              <div>
+                <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Monto a Abonar ($)*</label>
+                <input 
+                  type="number" 
+                  required 
+                  min="0.01"
+                  step="0.01"
+                  className="input-field" 
+                  value={abonoForm.monto} 
+                  onChange={(e) => setAbonoForm({...abonoForm, monto: e.target.value})} 
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Método de Pago*</label>
+                <select className="input-field" value={abonoForm.tipo} onChange={(e) => setAbonoForm({...abonoForm, tipo: e.target.value})}>
+                  <option value="efectivo">Efectivo</option>
+                  <option value="transferencia">Transferencia Bancaria</option>
+                  <option value="deposito">Depósito Bancario</option>
+                </select>
+              </div>
+
+              {abonoForm.tipo !== "efectivo" && (
+                <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div>
+                    <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Banco*</label>
+                    <select required className="input-field" value={abonoForm.banco} onChange={(e) => setAbonoForm({...abonoForm, banco: e.target.value})}>
+                      <option value="">Seleccione...</option>
+                      <option value="pichincha">Pichincha</option>
+                      <option value="guayaquil">Guayaquil</option>
+                      <option value="pacifico">Pacífico</option>
+                      <option value="jardin azuayo">Jardín Azuayo</option>
+                      <option value="bolivariano">Bolivariano</option>
+                      <option value="jep">JEP</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Nro Comprobante*</label>
+                    <input 
+                      type="text" 
+                      required 
+                      placeholder="Ej. 7335470" 
+                      className="input-field" 
+                      value={abonoForm.comprobante} 
+                      onChange={(e) => setAbonoForm({...abonoForm, comprobante: e.target.value})} 
+                    />
+                  </div>
+                  <div style={{ gridColumn: "span 2", marginTop: "4px" }}>
+                    <label style={{ fontSize: "0.8rem", fontWeight: 500, display: "flex", gap: "4px", alignItems: "center" }}>
+                      <Upload size={14} /> Subir Captura de Comprobante (Opcional)
+                    </label>
+                    <div style={{ border: "2px dashed var(--purple-pastel-soft)", borderRadius: "var(--radius-sm)", padding: "10px", textAlign: "center", cursor: "pointer", fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                      Arrastra o selecciona la imagen del recibo
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                <input type="checkbox" id="abonoFacturado" checked={abonoForm.facturado} onChange={(e) => setAbonoForm({...abonoForm, facturado: e.target.checked})} />
+                <label htmlFor="abonoFacturado" style={{ fontSize: "0.85rem" }}>Marcar factura como EMITIDA en el SRI</label>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAbonoModal(false)}>Cancelar</button>
                 <button type="submit" className="btn btn-primary">Registrar Ingreso</button>
               </div>
             </form>

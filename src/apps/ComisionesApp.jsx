@@ -139,7 +139,7 @@ export default function ComisionesApp() {
 
           {/* Results Summary and Table */}
           {result && (
-            <div className="glass fade-in" style={{ borderRadius: "var(--radius-md)", padding: "24px", boxShadow: "var(--shadow-md)" }}>
+            <div className="glass fade-in print-area" style={{ borderRadius: "var(--radius-md)", padding: "24px", boxShadow: "var(--shadow-md)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                 <div>
                   <h3 style={{ color: "var(--purple-dark)", fontWeight: 600 }}>Liquidación de Comisiones</h3>
