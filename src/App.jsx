@@ -23,8 +23,9 @@ import "./App.css";
 // 1. LOGIN COMPONENT
 function LoginScreen() {
   const { login } = useAuth();
-  const [email, setEmail] = useState("joshua@gmail.com"); // default prefill for easy demo
-  const [password, setPassword] = useState("joshua2026");
+  const [selectedUser, setSelectedUser] = useState(null); // 'admin' | 'recep' | null
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -41,6 +42,17 @@ function LoginScreen() {
     }
   };
 
+  const handleSelectUser = (type) => {
+    setSelectedUser(type);
+    setError("");
+    setPassword("");
+    if (type === "admin") {
+      setEmail("jeni@gmail.com");
+    } else {
+      setEmail("joshua@gmail.com");
+    }
+  };
+
   return (
     <div style={{
       display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh",
@@ -51,16 +63,18 @@ function LoginScreen() {
         boxShadow: "0 20px 25px -5px rgba(139, 92, 246, 0.1), 0 10px 10px -5px rgba(139, 92, 246, 0.04)",
         border: "1px solid rgba(255,255,255,0.6)"
       }}>
-        <div style={{ textAlign: "center", marginBottom: "30px" }}>
-          <div style={{
-            display: "inline-flex", padding: "16px", borderRadius: "50%",
-            background: "linear-gradient(135deg, var(--purple-pastel-soft) 0%, var(--pink-pastel-soft) 100%)",
-            color: "var(--purple-base)", marginBottom: "16px"
-          }}>
-            <Sparkles size={32} />
-          </div>
-          <h2 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--purple-dark)", letterSpacing: "-0.5px" }}>MERAKI</h2>
-          <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Centro de Terapia Integral • Gestión Interna</p>
+        <div style={{ textAlign: "center", marginBottom: "25px" }}>
+          <img 
+            src="/logo.png" 
+            alt="MERAKI" 
+            style={{
+              height: "90px",
+              objectFit: "contain",
+              marginBottom: "10px",
+              filter: "drop-shadow(0 4px 6px rgba(139, 92, 246, 0.1))"
+            }}
+          />
+          <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", fontWeight: 500 }}>Centro de Terapia Integral • Gestión Interna</p>
         </div>
 
         {error && (
@@ -72,37 +86,98 @@ function LoginScreen() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "6px" }}>Correo Electrónico</label>
-            <input 
-              type="email" 
-              required 
-              className="input-field" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "6px" }}>Contraseña</label>
-            <input 
-              type="password" 
-              required 
-              className="input-field" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          <button type="submit" className="btn btn-primary" style={{ width: "100%", justifyContent: "center", marginTop: "10px", padding: "12px" }} disabled={loading}>
-            {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
-          </button>
-        </form>
+        {!selectedUser ? (
+          <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center" }}>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", fontWeight: 600 }}>Selecciona tu perfil:</p>
+            
+            <div style={{ display: "flex", gap: "30px", justifyContent: "center", width: "100%" }}>
+              {/* Admin Profile */}
+              <div 
+                onClick={() => handleSelectUser("admin")} 
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", cursor: "pointer", flex: 1 }}
+                className="profile-card-hover"
+              >
+                <div style={{
+                  width: "80px", height: "80px", borderRadius: "50%",
+                  background: "linear-gradient(135deg, var(--purple-base) 0%, #a78bfa 100%)",
+                  display: "flex", justifyContent: "center", alignItems: "center",
+                  color: "white", boxShadow: "0 10px 15px -3px rgba(139, 92, 246, 0.25)",
+                  border: "3px solid white"
+                }}>
+                  <Lock size={32} />
+                </div>
+                <span style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "1rem" }}>Jeni</span>
+                <span style={{ color: "var(--purple-dark)", fontSize: "0.72rem", background: "var(--purple-pastel-soft)", padding: "2px 8px", borderRadius: "10px", fontWeight: 600 }}>Administración</span>
+              </div>
 
-        <div style={{ marginTop: "24px", textAlign: "center", fontSize: "0.8rem", color: "var(--text-muted)" }}>
-          <div style={{ fontWeight: 600, marginBottom: "4px" }}>Accesos de Demostración:</div>
-          <div>Admin: <strong>admin@meraki.com</strong> / clave: <strong>admin123</strong></div>
-          <div style={{ marginTop: "2px" }}>Recepción: <strong>joshua@meraki.com</strong> / clave: <strong>joshua123</strong></div>
-        </div>
+              {/* Recep Profile */}
+              <div 
+                onClick={() => handleSelectUser("recep")} 
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", cursor: "pointer", flex: 1 }}
+                className="profile-card-hover"
+              >
+                <div style={{
+                  width: "80px", height: "80px", borderRadius: "50%",
+                  background: "linear-gradient(135deg, var(--pink-base) 0%, #f472b6 100%)",
+                  display: "flex", justifyContent: "center", alignItems: "center",
+                  color: "white", boxShadow: "0 10px 15px -3px rgba(236, 72, 153, 0.25)",
+                  border: "3px solid white"
+                }}>
+                  <Users size={32} />
+                </div>
+                <span style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "1rem" }}>Joshua</span>
+                <span style={{ color: "var(--pink-dark)", fontSize: "0.72rem", background: "var(--pink-pastel-soft)", padding: "2px 8px", borderRadius: "10px", fontWeight: 600 }}>Recepción</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="fade-in" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "var(--bg-secondary)", padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
+              <div style={{
+                width: "40px", height: "40px", borderRadius: "50%",
+                background: selectedUser === "admin" 
+                  ? "linear-gradient(135deg, var(--purple-base) 0%, #a78bfa 100%)" 
+                  : "linear-gradient(135deg, var(--pink-base) 0%, #f472b6 100%)",
+                display: "flex", justifyContent: "center", alignItems: "center",
+                color: "white"
+              }}>
+                {selectedUser === "admin" ? <Lock size={18} /> : <Users size={18} />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h4 style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "0.9rem" }}>
+                  {selectedUser === "admin" ? "Jeni (Administración)" : "Joshua (Recepción)"}
+                </h4>
+                <p style={{ color: "var(--text-muted)", fontSize: "0.78rem", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                  {email}
+                </p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setSelectedUser(null)} 
+                style={{ border: "none", background: "none", color: "var(--purple-base)", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer" }}
+              >
+                Cambiar
+              </button>
+            </div>
+
+            <div>
+              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "6px" }}>Ingresa tu Contraseña</label>
+              <input 
+                type="password" 
+                required 
+                autoFocus
+                className="input-field" 
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            
+            <button type="submit" className="btn btn-primary" style={{ width: "100%", justifyContent: "center", marginTop: "10px", padding: "12px" }} disabled={loading}>
+              {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
