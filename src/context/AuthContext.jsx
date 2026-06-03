@@ -1,0 +1,155 @@
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { auth, isConfigured } from "../firebase/config";
+import { 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  createUserWithEmailAndPassword 
+} from "firebase/auth";
+import { getCollection, addDocument, setDocument } from "../db";
+
+const AuthContext = createContext();
+
+export const useAuth = () => useContext(AuthContext);
+
+export const AuthProvider = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // --- MOCK USERS ---
+  const mockUsers = [
+    { email: "admin@meraki.com", uid: "uid_admin", nombre: "Administradora Meraki", rol: "administrador" },
+    { email: "joshua@meraki.com", uid: "uid_joshua", nombre: "Joshua (Recepción)", rol: "recepcionista" }
+  ];
+
+  useEffect(() => {
+    if (isConfigured && auth) {
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          // Fetch user role from database
+          try {
+            const users = await getCollection("usuarios");
+            const dbUser = users.find(u => u.id === user.uid);
+            if (dbUser) {
+              setCurrentUser({
+                uid: user.uid,
+                email: user.email,
+                nombre: dbUser.nombre || user.email,
+                rol: dbUser.rol || "recepcionista"
+              });
+            } else {
+              // Create user in DB if doesn't exist
+              const newUserData = {
+                id: user.uid,
+                nombre: user.email.split("@")[0],
+                rol: "recepcionista",
+                correo: user.email
+              };
+              await setDocument("usuarios", user.uid, newUserData);
+              setCurrentUser({
+                uid: user.uid,
+                email: user.email,
+                nombre: newUserData.nombre,
+                rol: newUserData.rol
+              });
+            }
+          } catch (e) {
+            console.error("Error fetching db user info:", e);
+            setCurrentUser({
+              uid: user.uid,
+              email: user.email,
+              nombre: user.email.split("@")[0],
+              rol: "recepcionista"
+            });
+          }
+        } else {
+          setCurrentUser(null);
+        }
+        setLoading(false);
+      });
+      return unsubscribe;
+    } else {
+      // Mock mode auth persistence
+      const savedUser = localStorage.getItem("meraki_logged_user");
+      if (savedUser) {
+        setCurrentUser(JSON.parse(savedUser));
+      }
+      setLoading(false);
+    }
+  }, []);
+
+  const login = async (email, password) => {
+    if (isConfigured && auth) {
+      return signInWithEmailAndPassword(auth, email, password);
+    } else {
+      // Simulación de login en modo local
+      return new Promise((resolve, reject) => {
+        setTimeout(() => {
+          const user = mockUsers.find(u => u.email === email && password === (email.includes("admin") ? "admin123" : "joshua123"));
+          if (user) {
+            localStorage.setItem("meraki_logged_user", JSON.stringify(user));
+            setCurrentUser(user);
+            resolve(user);
+          } else {
+            reject(new Error("Usuario o contraseña incorrectos. Usa admin@meraki.com (clave: admin123) o joshua@meraki.com (clave: joshua123)"));
+          }
+        }, 800);
+      });
+    }
+  };
+
+  const logout = async () => {
+    if (isConfigured && auth) {
+      return signOut(auth);
+    } else {
+      localStorage.removeItem("meraki_logged_user");
+      setCurrentUser(null);
+    }
+  };
+
+  const createNewUser = async (email, password, nombre, rol) => {
+    if (isConfigured && auth) {
+      // Create user in firebase auth
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      // Save details to Firestore
+      await setDocument("usuarios", credential.user.uid, {
+        id: credential.user.uid,
+        nombre,
+        rol,
+        correo: email
+      });
+      return credential.user;
+    } else {
+      // Simular creación de usuario en modo local
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const newMockUser = {
+            id: Math.random().toString(36).substr(2, 9),
+            nombre,
+            rol,
+            correo: email
+          };
+          // Add to local storage collection
+          const usersList = JSON.parse(localStorage.getItem("meraki_usuarios") || "[]");
+          usersList.push(newMockUser);
+          localStorage.setItem("meraki_usuarios", JSON.stringify(usersList));
+          resolve(newMockUser);
+        }, 500);
+      });
+    }
+  };
+
+  const value = {
+    currentUser,
+    login,
+    logout,
+    createNewUser,
+    isLocalDb: !isConfigured
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
+};

@@ -1,0 +1,21 @@
+{
+  "short_name": "MERAKI",
+  "name": "MERAKI - Centro de Terapia Integral",
+  "icons": [
+    {
+      "src": "pwa-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "pwa-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#F5F3FF",
+  "theme_color": "#8B5CF6",
+  "display": "standalone",
+  "orientation": "portrait"
+}
