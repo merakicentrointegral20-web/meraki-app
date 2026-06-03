@@ -272,6 +272,7 @@ button, input, select, textarea {
   .input-field, 
   select, 
   label,
+  form,
   .glass:not(.print-area) {
     display: none !important;
   }

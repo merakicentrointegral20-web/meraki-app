@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { subscribeToCollection, getCollection } from "../db";
+import { subscribeToCollection, getCollection, addDocument, deleteDocument } from "../db";
 import { useAuth } from "../context/AuthContext";
-import { Calculator, DollarSign, Calendar, FileText, Printer, ShieldAlert } from "lucide-react";
+import { Calculator, DollarSign, Calendar, FileText, Printer, ShieldAlert, Plus, Trash2 } from "lucide-react";
 
 export default function ComisionesApp() {
   const { currentUser } = useAuth();
@@ -9,6 +9,7 @@ export default function ComisionesApp() {
 
   const [terapeutas, setTerapeutas] = useState([]);
   const [citas, setCitas] = useState([]);
+  const [bonos, setBonos] = useState([]);
   
   // Filter form
   const [selectedTerId, setSelectedTerId] = useState("");
@@ -17,17 +18,11 @@ export default function ComisionesApp() {
   
   // Calculations result
   const [result, setResult] = useState(null);
+  
+  // New bonus form state
+  const [bonusForm, setBonusForm] = useState({ motivo: "", monto: "", fecha: "" });
 
-  useEffect(() => {
-    const unsubTer = subscribeToCollection("terapeutas", setTerapeutas);
-    const unsubCitas = subscribeToCollection("citas", setCitas);
-    return () => {
-      unsubTer();
-      unsubCitas();
-    };
-  }, []);
-
-  // Set default dates (current month)
+  // Initialize dates
   useEffect(() => {
     const today = new Date();
     const y = today.getFullYear();
@@ -37,6 +32,18 @@ export default function ComisionesApp() {
     
     setDateStart(firstDay);
     setDateEnd(lastDay);
+    setBonusForm(prev => ({ ...prev, fecha: lastDay }));
+  }, []);
+
+  useEffect(() => {
+    const unsubTer = subscribeToCollection("terapeutas", setTerapeutas);
+    const unsubCitas = subscribeToCollection("citas", setCitas);
+    const unsubBonos = subscribeToCollection("bonos_extras", setBonos);
+    return () => {
+      unsubTer();
+      unsubCitas();
+      unsubBonos();
+    };
   }, []);
 
   const calculateCommissions = () => {
@@ -49,14 +56,16 @@ export default function ComisionesApp() {
     if (!therapist) return;
 
     if (!therapist.comisionActiva) {
-      alert(`El profesional ${therapist.nombre} está registrado bajo modalidad de Salario Fijo. No genera comisiones por porcentaje.`);
+      const fixedSal = Number(therapist.salarioFijo !== undefined ? therapist.salarioFijo : 500);
+      alert(`El profesional ${therapist.nombre} está registrado bajo modalidad de Salario Fijo ($${fixedSal}). Se calculará su salario base mensual más bonos y extras.`);
       setResult({
+        therapistId: selectedTerId,
         therapistName: therapist.nombre,
         modality: "Salario Fijo",
         totalSessions: 0,
         totalBilling: 0,
         percentage: 0,
-        amountDue: 0,
+        baseAmount: fixedSal,
         sessionsList: []
       });
       return;
@@ -81,19 +90,82 @@ export default function ComisionesApp() {
     const amountDue = (totalBilling * percentage) / 100;
 
     setResult({
+      therapistId: selectedTerId,
       therapistName: therapist.nombre,
       modality: "Comisión por Porcentaje",
       totalSessions: matchingSessions.length,
       totalBilling,
       percentage,
-      amountDue,
+      baseAmount: amountDue,
       sessionsList: matchingSessions
     });
+  };
+
+  const handleAddBonus = async (e) => {
+    e.preventDefault();
+    if (!result || !bonusForm.motivo || !bonusForm.monto || !bonusForm.fecha) {
+      alert("Por favor completa todos los campos del ajuste.");
+      return;
+    }
+
+    try {
+      const parsedMonto = Number(bonusForm.monto);
+      const isWithinRange = bonusForm.fecha >= dateStart && bonusForm.fecha <= dateEnd;
+      if (!isWithinRange) {
+        if (!confirm("Nota: La fecha del ajuste está fuera del rango consultado. ¿Deseas agregarlo de todas formas?")) {
+          return;
+        }
+      }
+
+      await addDocument("bonos_extras", {
+        terapeutaId: result.therapistId,
+        monto: parsedMonto,
+        motivo: bonusForm.motivo,
+        fecha: bonusForm.fecha,
+        mes: bonusForm.fecha.substring(0, 7), // format: YYYY-MM
+        registradoPor: currentUser?.nombre || "Recepción"
+      });
+
+      setBonusForm({
+        motivo: "",
+        monto: "",
+        fecha: dateEnd || new Date().toISOString().split('T')[0]
+      });
+      alert("Ajuste / Bono registrado correctamente.");
+    } catch (err) {
+      console.error(err);
+      alert("Error al registrar ajuste: " + err.message);
+    }
+  };
+
+  const handleDeleteBonus = async (bonusId) => {
+    if (confirm("¿Estás seguro de eliminar este ajuste permanentemente?")) {
+      try {
+        await deleteDocument("bonos_extras", bonusId);
+        alert("Ajuste eliminado correctamente.");
+      } catch (err) {
+        console.error(err);
+        alert("Error al eliminar ajuste: " + err.message);
+      }
+    }
   };
 
   const handlePrint = () => {
     window.print();
   };
+
+  const getMatchingBonos = () => {
+    if (!result) return [];
+    return bonos.filter(b => 
+      b.terapeutaId === result.therapistId &&
+      b.fecha >= dateStart &&
+      b.fecha <= dateEnd
+    );
+  };
+
+  const matchingBonosList = getMatchingBonos();
+  const totalBonosVal = matchingBonosList.reduce((acc, b) => acc + Number(b.monto), 0);
+  const finalAmountDue = result ? (result.baseAmount + totalBonosVal) : 0;
 
   return (
     <div className="fade-in" style={{ padding: "20px" }}>
@@ -168,7 +240,10 @@ export default function ComisionesApp() {
                 </div>
                 <div style={{ backgroundColor: "var(--purple-light)", border: "1px solid var(--purple-pastel-soft)", padding: "14px", borderRadius: "var(--radius-sm)", borderLeft: "4px solid var(--purple-base)" }}>
                   <div style={{ color: "var(--purple-dark)", fontSize: "0.8rem", fontWeight: 500 }}>Monto a Pagar</div>
-                  <div style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--purple-dark)", marginTop: "4px" }}>${result.amountDue.toFixed(2)}</div>
+                  <div style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--purple-dark)", marginTop: "4px" }}>${finalAmountDue.toFixed(2)}</div>
+                  <div style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "2px" }}>
+                    Base: ${result.baseAmount.toFixed(2)} | Extras: ${totalBonosVal.toFixed(2)}
+                  </div>
                 </div>
               </div>
 
@@ -213,6 +288,81 @@ export default function ComisionesApp() {
                   </tbody>
                 </table>
                 </div>
+              </div>
+
+              {/* Additional Adjustments (Bonos / Horas Extras) */}
+              <div style={{ marginTop: "24px", borderTop: "1px solid var(--border-light)", paddingTop: "20px" }}>
+                <h4 style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "12px", display: "flex", gap: "6px", alignItems: "center" }}>
+                  <DollarSign size={18} color="var(--purple-base)" /> Ajustes Adicionales (Bonos, Horas Extras, Descuentos)
+                </h4>
+
+                {/* List of adjustments */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+                  {matchingBonosList.map((b) => (
+                    <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "var(--bg-secondary)", padding: "10px 14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-soft)", fontSize: "0.85rem" }}>
+                      <div>
+                        <span style={{ fontWeight: 500, color: "var(--text-muted)", marginRight: "8px" }}>{b.fecha}</span>
+                        <strong style={{ color: "var(--text-main)" }}>{b.motivo}</strong>
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginLeft: "8px" }}>(Registrado por: {b.registradoPor})</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <span style={{ fontWeight: 600, color: b.monto >= 0 ? "var(--purple-dark)" : "var(--pink-dark)" }}>
+                          {b.monto >= 0 ? `+$${Number(b.monto).toFixed(2)}` : `-$${Math.abs(Number(b.monto)).toFixed(2)}`}
+                        </span>
+                        <button 
+                          style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-muted)", padding: "4px" }}
+                          onClick={() => handleDeleteBonus(b.id)}
+                          title="Eliminar Ajuste"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {matchingBonosList.length === 0 && (
+                    <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>Sin ajustes o bonos registrados para este período.</span>
+                  )}
+                </div>
+
+                {/* Form to add new bonus/extra hour */}
+                <form onSubmit={handleAddBonus} className="responsive-flex" style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap", marginTop: "12px" }}>
+                  <div style={{ flex: 2, minWidth: "150px" }}>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Descripción / Motivo*</label>
+                    <input 
+                      type="text" 
+                      required 
+                      placeholder="Ej. Horas Extras Sábado, Bono Productividad" 
+                      className="input-field" 
+                      value={bonusForm.motivo} 
+                      onChange={(e) => setBonusForm({...bonusForm, motivo: e.target.value})} 
+                    />
+                  </div>
+                  <div style={{ width: "120px" }}>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Valor ($)*</label>
+                    <input 
+                      type="number" 
+                      required 
+                      step="0.01"
+                      placeholder="Ej. 25.00" 
+                      className="input-field" 
+                      value={bonusForm.monto} 
+                      onChange={(e) => setBonusForm({...bonusForm, monto: e.target.value})} 
+                    />
+                  </div>
+                  <div style={{ width: "140px" }}>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Fecha*</label>
+                    <input 
+                      type="date" 
+                      required 
+                      className="input-field" 
+                      value={bonusForm.fecha} 
+                      onChange={(e) => setBonusForm({...bonusForm, fecha: e.target.value})} 
+                    />
+                  </div>
+                  <button type="submit" className="btn btn-primary" style={{ height: "42px" }}>
+                    <Plus size={16} /> Agregar
+                  </button>
+                </form>
               </div>
             </div>
           )}
