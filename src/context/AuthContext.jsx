@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { auth, isConfigured } from "../firebase/config";
+import { auth, db, isConfigured } from "../firebase/config";
 import { 
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
   createUserWithEmailAndPassword 
 } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { getCollection, addDocument, setDocument } from "../db";
 
 const AuthContext = createContext();
@@ -28,8 +29,8 @@ export const AuthProvider = ({ children }) => {
         if (user) {
           // Fetch user role from database
           try {
-            const users = await getCollection("usuarios");
-            const dbUser = users.find(u => u.id === user.uid);
+            const userDocSnap = await getDoc(doc(db, "usuarios", user.uid));
+            const dbUser = userDocSnap.exists() ? userDocSnap.data() : null;
             if (dbUser) {
               setCurrentUser({
                 uid: user.uid,

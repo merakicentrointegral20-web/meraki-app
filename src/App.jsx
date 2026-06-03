@@ -454,7 +454,23 @@ function App() {
 }
 
 function AuthContainer() {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
+  if (loading) {
+    return (
+      <div style={{
+        display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
+        minHeight: "100vh", background: "linear-gradient(135deg, #F5F3FF 0%, #FFF5F5 100%)",
+        gap: "16px"
+      }}>
+        <div style={{
+          width: "40px", height: "40px", borderRadius: "50%",
+          border: "4px solid var(--purple-pastel-soft)", borderTopColor: "var(--purple-base)",
+          animation: "spin 1s linear infinite"
+        }} />
+        <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--purple-dark)" }}>Cargando MERAKI...</span>
+      </div>
+    );
+  }
   return currentUser ? <MainDashboard /> : <LoginScreen />;
 }
 

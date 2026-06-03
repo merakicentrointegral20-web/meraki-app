@@ -252,4 +252,8 @@ button, input, select, textarea {
   transform: scale(0.97);
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 
