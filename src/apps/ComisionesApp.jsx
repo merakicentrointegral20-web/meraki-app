@@ -56,6 +56,10 @@ export default function ComisionesApp() {
     if (!therapist) return;
 
     if (!therapist.comisionActiva) {
+      if (!isAdmin) {
+        alert("No tienes permisos para ver liquidaciones de profesionales con Salario Fijo.");
+        return;
+      }
       const fixedSal = Number(therapist.salarioFijo !== undefined ? therapist.salarioFijo : 500);
       alert(`El profesional ${therapist.nombre} está registrado bajo modalidad de Salario Fijo ($${fixedSal}). Se calculará su salario base mensual más bonos y extras.`);
       setResult({
@@ -169,7 +173,7 @@ export default function ComisionesApp() {
   };
 
   const matchingBonosList = getMatchingBonos();
-  const totalBonosVal = matchingBonosList.reduce((acc, b) => acc + Number(b.monto), 0);
+  const totalBonosVal = isAdmin ? matchingBonosList.reduce((acc, b) => acc + Number(b.monto), 0) : 0;
   const finalAmountDue = result ? (result.baseAmount + totalBonosVal) : 0;
 
   return (
@@ -193,11 +197,13 @@ export default function ComisionesApp() {
                 <label style={{ fontSize: "0.8rem", fontWeight: 500, display: "block", marginBottom: "6px" }}>Profesional Evaluado</label>
                 <select className="input-field" value={selectedTerId} onChange={(e) => setSelectedTerId(e.target.value)}>
                   <option value="">Seleccione profesional...</option>
-                  {terapeutas.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.nombre} {t.comisionActiva ? `(${t.comisionPorcentaje}%)` : "(Salario Fijo)"}
-                    </option>
-                  ))}
+                  {terapeutas
+                    .filter(t => isAdmin || t.comisionActiva)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.nombre} {t.comisionActiva ? `(${t.comisionPorcentaje}%)` : "(Salario Fijo)"}
+                      </option>
+                    ))}
                 </select>
               </div>
               <div>
@@ -246,9 +252,11 @@ export default function ComisionesApp() {
                 <div style={{ backgroundColor: "var(--purple-light)", border: "1px solid var(--purple-pastel-soft)", padding: "14px", borderRadius: "var(--radius-sm)", borderLeft: "4px solid var(--purple-base)" }}>
                   <div style={{ color: "var(--purple-dark)", fontSize: "0.8rem", fontWeight: 500 }}>Monto a Pagar</div>
                   <div style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--purple-dark)", marginTop: "4px" }}>${finalAmountDue.toFixed(2)}</div>
-                  <div style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "2px" }}>
-                    Base: $${result.baseAmount.toFixed(2)} | Ajustes: ${totalBonosVal >= 0 ? `+$${totalBonosVal.toFixed(2)}` : `-$${Math.abs(totalBonosVal).toFixed(2)}`}
-                  </div>
+                  {isAdmin && (
+                    <div style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "2px" }}>
+                      Base: $${result.baseAmount.toFixed(2)} | Ajustes: ${totalBonosVal >= 0 ? `+$${totalBonosVal.toFixed(2)}` : `-$${Math.abs(totalBonosVal).toFixed(2)}`}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -296,90 +304,92 @@ export default function ComisionesApp() {
               </div>
 
               {/* Additional Adjustments (Bonos / Horas Extras) */}
-              <div style={{ marginTop: "24px", borderTop: "1px solid var(--border-light)", paddingTop: "20px" }}>
-                <h4 style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "12px", display: "flex", gap: "6px", alignItems: "center" }}>
-                  <DollarSign size={18} color="var(--purple-base)" /> Ajustes Adicionales (Bonos, Horas Extras, Descuentos)
-                </h4>
+              {isAdmin && (
+                <div style={{ marginTop: "24px", borderTop: "1px solid var(--border-light)", paddingTop: "20px" }}>
+                  <h4 style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "12px", display: "flex", gap: "6px", alignItems: "center" }}>
+                    <DollarSign size={18} color="var(--purple-base)" /> Ajustes Adicionales (Bonos, Horas Extras, Descuentos)
+                  </h4>
 
-                {/* List of adjustments */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
-                  {matchingBonosList.map((b) => (
-                    <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "var(--bg-secondary)", padding: "10px 14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-soft)", fontSize: "0.85rem" }}>
-                      <div>
-                        <span style={{ fontWeight: 500, color: "var(--text-muted)", marginRight: "8px" }}>{b.fecha}</span>
-                        <strong style={{ color: "var(--text-main)" }}>{b.motivo}</strong>
-                        <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginLeft: "8px" }}>(Registrado por: {b.registradoPor})</span>
+                  {/* List of adjustments */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+                    {matchingBonosList.map((b) => (
+                      <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "var(--bg-secondary)", padding: "10px 14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-soft)", fontSize: "0.85rem" }}>
+                        <div>
+                          <span style={{ fontWeight: 500, color: "var(--text-muted)", marginRight: "8px" }}>{b.fecha}</span>
+                          <strong style={{ color: "var(--text-main)" }}>{b.motivo}</strong>
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginLeft: "8px" }}>(Registrado por: {b.registradoPor})</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <span style={{ fontWeight: 600, color: b.monto >= 0 ? "var(--purple-dark)" : "var(--pink-dark)" }}>
+                            {b.monto >= 0 ? `+$${Number(b.monto).toFixed(2)}` : `-$${Math.abs(Number(b.monto)).toFixed(2)}`}
+                          </span>
+                          <button 
+                            style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-muted)", padding: "4px" }}
+                            onClick={() => handleDeleteBonus(b.id)}
+                            title="Eliminar Ajuste"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <span style={{ fontWeight: 600, color: b.monto >= 0 ? "var(--purple-dark)" : "var(--pink-dark)" }}>
-                          {b.monto >= 0 ? `+$${Number(b.monto).toFixed(2)}` : `-$${Math.abs(Number(b.monto)).toFixed(2)}`}
-                        </span>
-                        <button 
-                          style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-muted)", padding: "4px" }}
-                          onClick={() => handleDeleteBonus(b.id)}
-                          title="Eliminar Ajuste"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                    ))}
+                    {matchingBonosList.length === 0 && (
+                      <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>Sin ajustes o bonos registrados para este período.</span>
+                    )}
+                  </div>
+
+                  {/* Form to add new bonus/extra hour */}
+                  <form onSubmit={handleAddBonus} className="responsive-flex" style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap", marginTop: "12px" }}>
+                    <div style={{ width: "160px" }}>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Tipo de Ajuste*</label>
+                      <select 
+                        className="input-field" 
+                        value={bonusForm.tipo} 
+                        onChange={(e) => setBonusForm({...bonusForm, tipo: e.target.value})}
+                      >
+                        <option value="ingreso">Bono / Extra (+)</option>
+                        <option value="descuento">Descuento / Amonestación (-)</option>
+                      </select>
                     </div>
-                  ))}
-                  {matchingBonosList.length === 0 && (
-                    <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>Sin ajustes o bonos registrados para este período.</span>
-                  )}
+                    <div style={{ flex: 2, minWidth: "150px" }}>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Descripción / Motivo*</label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder="Ej. Horas Extras Sábado, Bono Productividad" 
+                        className="input-field" 
+                        value={bonusForm.motivo} 
+                        onChange={(e) => setBonusForm({...bonusForm, motivo: e.target.value})} 
+                      />
+                    </div>
+                    <div style={{ width: "120px" }}>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Valor ($)*</label>
+                      <input 
+                        type="number" 
+                        required 
+                        step="0.01"
+                        placeholder="Ej. 25.00" 
+                        className="input-field" 
+                        value={bonusForm.monto} 
+                        onChange={(e) => setBonusForm({...bonusForm, monto: e.target.value})} 
+                      />
+                    </div>
+                    <div style={{ width: "140px" }}>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Fecha*</label>
+                      <input 
+                        type="date" 
+                        required 
+                        className="input-field" 
+                        value={bonusForm.fecha} 
+                        onChange={(e) => setBonusForm({...bonusForm, fecha: e.target.value})} 
+                      />
+                    </div>
+                    <button type="submit" className="btn btn-primary" style={{ height: "42px" }}>
+                      <Plus size={16} /> Agregar
+                    </button>
+                  </form>
                 </div>
-
-                {/* Form to add new bonus/extra hour */}
-                <form onSubmit={handleAddBonus} className="responsive-flex" style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap", marginTop: "12px" }}>
-                  <div style={{ width: "160px" }}>
-                    <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Tipo de Ajuste*</label>
-                    <select 
-                      className="input-field" 
-                      value={bonusForm.tipo} 
-                      onChange={(e) => setBonusForm({...bonusForm, tipo: e.target.value})}
-                    >
-                      <option value="ingreso">Bono / Extra (+)</option>
-                      <option value="descuento">Descuento / Amonestación (-)</option>
-                    </select>
-                  </div>
-                  <div style={{ flex: 2, minWidth: "150px" }}>
-                    <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Descripción / Motivo*</label>
-                    <input 
-                      type="text" 
-                      required 
-                      placeholder="Ej. Horas Extras Sábado, Bono Productividad" 
-                      className="input-field" 
-                      value={bonusForm.motivo} 
-                      onChange={(e) => setBonusForm({...bonusForm, motivo: e.target.value})} 
-                    />
-                  </div>
-                  <div style={{ width: "120px" }}>
-                    <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Valor ($)*</label>
-                    <input 
-                      type="number" 
-                      required 
-                      step="0.01"
-                      placeholder="Ej. 25.00" 
-                      className="input-field" 
-                      value={bonusForm.monto} 
-                      onChange={(e) => setBonusForm({...bonusForm, monto: e.target.value})} 
-                    />
-                  </div>
-                  <div style={{ width: "140px" }}>
-                    <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Fecha*</label>
-                    <input 
-                      type="date" 
-                      required 
-                      className="input-field" 
-                      value={bonusForm.fecha} 
-                      onChange={(e) => setBonusForm({...bonusForm, fecha: e.target.value})} 
-                    />
-                  </div>
-                  <button type="submit" className="btn btn-primary" style={{ height: "42px" }}>
-                    <Plus size={16} /> Agregar
-                  </button>
-                </form>
-              </div>
+              )}
             </div>
           )}
         </div>
