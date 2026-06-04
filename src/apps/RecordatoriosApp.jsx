@@ -180,8 +180,17 @@ export default function RecordatoriosApp() {
   const getDailyMessage = (item) => {
     const [year, month, day] = targetDate.split("-").map(Number);
     const dateObj = new Date(year, month - 1, day);
-    const textDate = dateObj.toLocaleDateString("es-ES", { weekday: 'long', day: 'numeric', month: 'long' });
-    const therapiesText = item.terapias.map(t => `- *${t.servicio}* a las *${t.hora}* con ${t.terapeuta}`).join("\n");
+    
+    const fmtDateDaily = (dObj) => {
+      const dayNames = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
+      const monthNames = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+      const dayName = dayNames[dObj.getDay()];
+      const mName = monthNames[dObj.getMonth()];
+      return `${dayName}, ${String(dObj.getDate()).padStart(2, '0')} DE ${mName} DEL ${dObj.getFullYear()}`;
+    };
+
+    const textDate = fmtDateDaily(dateObj);
+    const therapiesText = item.terapias.map(t => `• *${t.servicio.toUpperCase()}* a las *${t.hora}* con *${t.terapeuta.toUpperCase()}*`).join("\n");
     
     const localTodayStr = getLocalDateString(new Date());
     const tomorrowObj = new Date();
@@ -198,9 +207,9 @@ export default function RecordatoriosApp() {
     }
     
     return `¡Hola *${item.representante.toUpperCase()}*! 👋\n\n` +
-           `Te recordamos la cita de *${item.pacienteNombre.toUpperCase()}* en *MERAKI* 🧘‍♀️ para ${relativeDay} *${textDate.toUpperCase()}*:\n` +
+           `Te recordamos la cita de *${item.pacienteNombre.toUpperCase()}* en *MERAKI* 🧘‍♀️ para ${relativeDay} *${textDate}*:\n` +
            `${therapiesText}\n\n` +
-           `Por favor, confirmar su asistencia respondiendo a este mensaje. Muchas gracias.`;
+           `Por favor, confirma tu asistencia respondiendo a este mensaje. Muchas gracias.`;
   };
 
   const getWeeklyMessage = (item) => {
