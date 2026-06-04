@@ -20,7 +20,7 @@ export default function ComisionesApp() {
   const [result, setResult] = useState(null);
   
   // New bonus form state
-  const [bonusForm, setBonusForm] = useState({ motivo: "", monto: "", fecha: "" });
+  const [bonusForm, setBonusForm] = useState({ motivo: "", monto: "", fecha: "", tipo: "ingreso" });
 
   // Initialize dates
   useEffect(() => {
@@ -32,7 +32,7 @@ export default function ComisionesApp() {
     
     setDateStart(firstDay);
     setDateEnd(lastDay);
-    setBonusForm(prev => ({ ...prev, fecha: lastDay }));
+    setBonusForm(prev => ({ ...prev, fecha: lastDay, tipo: "ingreso" }));
   }, []);
 
   useEffect(() => {
@@ -109,7 +109,11 @@ export default function ComisionesApp() {
     }
 
     try {
-      const parsedMonto = Number(bonusForm.monto);
+      let parsedMonto = Number(bonusForm.monto);
+      if (bonusForm.tipo === "descuento") {
+        parsedMonto = -Math.abs(parsedMonto);
+      }
+
       const isWithinRange = bonusForm.fecha >= dateStart && bonusForm.fecha <= dateEnd;
       if (!isWithinRange) {
         if (!confirm("Nota: La fecha del ajuste está fuera del rango consultado. ¿Deseas agregarlo de todas formas?")) {
@@ -129,7 +133,8 @@ export default function ComisionesApp() {
       setBonusForm({
         motivo: "",
         monto: "",
-        fecha: dateEnd || new Date().toISOString().split('T')[0]
+        fecha: dateEnd || new Date().toISOString().split('T')[0],
+        tipo: "ingreso"
       });
       alert("Ajuste / Bono registrado correctamente.");
     } catch (err) {
@@ -242,7 +247,7 @@ export default function ComisionesApp() {
                   <div style={{ color: "var(--purple-dark)", fontSize: "0.8rem", fontWeight: 500 }}>Monto a Pagar</div>
                   <div style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--purple-dark)", marginTop: "4px" }}>${finalAmountDue.toFixed(2)}</div>
                   <div style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "2px" }}>
-                    Base: ${result.baseAmount.toFixed(2)} | Extras: ${totalBonosVal.toFixed(2)}
+                    Base: $${result.baseAmount.toFixed(2)} | Ajustes: ${totalBonosVal >= 0 ? `+$${totalBonosVal.toFixed(2)}` : `-$${Math.abs(totalBonosVal).toFixed(2)}`}
                   </div>
                 </div>
               </div>
@@ -326,6 +331,17 @@ export default function ComisionesApp() {
 
                 {/* Form to add new bonus/extra hour */}
                 <form onSubmit={handleAddBonus} className="responsive-flex" style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap", marginTop: "12px" }}>
+                  <div style={{ width: "160px" }}>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Tipo de Ajuste*</label>
+                    <select 
+                      className="input-field" 
+                      value={bonusForm.tipo} 
+                      onChange={(e) => setBonusForm({...bonusForm, tipo: e.target.value})}
+                    >
+                      <option value="ingreso">Bono / Extra (+)</option>
+                      <option value="descuento">Descuento / Amonestación (-)</option>
+                    </select>
+                  </div>
                   <div style={{ flex: 2, minWidth: "150px" }}>
                     <label style={{ fontSize: "0.75rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Descripción / Motivo*</label>
                     <input 
