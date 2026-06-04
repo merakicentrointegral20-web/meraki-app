@@ -218,6 +218,27 @@ export default function CajaApp() {
     }
   };
 
+  const handleClearDebt = async (deuda) => {
+    if (confirm(`¿Estás seguro de eliminar la deuda pendiente de $${deuda.saldoDebe} de ${deuda.representante}? Esto registrará un ajuste contable para saldar la cuenta.`)) {
+      try {
+        await addDocument("transacciones", {
+          representanteId: deuda.repId,
+          pacienteNombre: deuda.pacienteNombre,
+          monto: Number(deuda.saldoDebe),
+          tipo: "ajuste_saldo",
+          motivo: "Depuración / Eliminación de deudas viejas",
+          fechaRegistro: new Date().toISOString(),
+          verificado: true,
+          facturado: false
+        });
+        alert("Deuda eliminada y saldada con éxito.");
+      } catch (err) {
+        console.error(err);
+        alert("Error al eliminar la deuda.");
+      }
+    }
+  };
+
   const handleVerifyTransaction = async (transId) => {
     if (!isAdmin) {
       alert("Solo el Administrador puede verificar transferencias bancarias.");
@@ -549,13 +570,23 @@ export default function CajaApp() {
                   <td style={{ padding: "12px 8px" }}>${d.totalAbonado}</td>
                   <td style={{ padding: "12px 8px", fontWeight: 600, color: "var(--pink-base)" }}>${d.saldoDebe}</td>
                   <td style={{ padding: "12px 8px", textAlign: "right" }}>
-                    <button 
-                      className="btn btn-primary"
-                      style={{ padding: "6px 12px", fontSize: "0.8rem" }}
-                      onClick={() => handleOpenAbonoModal(d)}
-                    >
-                      Registrar Pago
-                    </button>
+                    <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
+                      <button 
+                        className="btn btn-primary"
+                        style={{ padding: "6px 12px", fontSize: "0.8rem" }}
+                        onClick={() => handleOpenAbonoModal(d)}
+                      >
+                        Registrar Pago
+                      </button>
+                      <button 
+                        className="btn btn-danger"
+                        style={{ padding: "6px 10px", fontSize: "0.8rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                        onClick={() => handleClearDebt(d)}
+                        title="Eliminar / Depurar Deuda"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
