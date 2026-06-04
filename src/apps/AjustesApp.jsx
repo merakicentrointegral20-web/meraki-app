@@ -306,18 +306,18 @@ export default function AjustesApp() {
                     <input type="text" required placeholder="593987654321" className="input-field" value={terForm.telefono} onChange={(e) => setTerForm({...terForm, telefono: e.target.value})} />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "12px" }}>
-                    <input type="checkbox" id="comisionActiva" checked={terForm.comisionActiva} onChange={(e) => setTerForm({...terForm, comisionActiva: e.target.checked})} />
+                    <input type="checkbox" id="comisionActiva" disabled={!isAdmin} checked={terForm.comisionActiva} onChange={(e) => setTerForm({...terForm, comisionActiva: e.target.checked})} />
                     <label htmlFor="comisionActiva" style={{ fontSize: "0.85rem" }}>¿Trabaja por Comisión (% del cobro)?</label>
                   </div>
                   {terForm.comisionActiva ? (
                     <div>
                       <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Porcentaje de Comisión (%)*</label>
-                      <input type="number" required className="input-field" min="0" max="100" value={terForm.comisionPorcentaje} onChange={(e) => setTerForm({...terForm, comisionPorcentaje: e.target.value})} />
+                      <input type="number" required disabled={!isAdmin} className="input-field" min="0" max="100" value={terForm.comisionPorcentaje} onChange={(e) => setTerForm({...terForm, comisionPorcentaje: e.target.value})} />
                     </div>
                   ) : (
                     <div>
                       <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Salario Fijo Mensual ($)*</label>
-                      <input type="number" required className="input-field" min="0" value={terForm.salarioFijo} onChange={(e) => setTerForm({...terForm, salarioFijo: e.target.value})} />
+                      <input type="number" required disabled={!isAdmin} className="input-field" min="0" value={terForm.salarioFijo} onChange={(e) => setTerForm({...terForm, salarioFijo: e.target.value})} />
                     </div>
                   )}
                   <button type="submit" className="btn btn-primary" style={{ gridColumn: "span 2", marginTop: "8px", justifyContent: "center" }}>
@@ -385,7 +385,7 @@ export default function AjustesApp() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <label style={{ fontSize: "0.8rem", fontWeight: 500, display: "block", marginBottom: "4px" }}>Costo Estándar ($)*</label>
-                    <input type="number" required className="input-field" value={srvForm.costo} onChange={(e) => setSrvForm({...srvForm, costo: e.target.value})} />
+                    <input type="number" required disabled={!isAdmin} className="input-field" value={srvForm.costo} onChange={(e) => setSrvForm({...srvForm, costo: e.target.value})} />
                   </div>
                   <button type="submit" className="btn btn-primary" style={{ height: "42px" }}>
                     <Plus size={16} /> Agregar
@@ -521,18 +521,18 @@ export default function AjustesApp() {
                   <input type="text" required className="input-field" value={editingTerapeuta.telefono || ""} onChange={(e) => setEditingTerapeuta({...editingTerapeuta, telefono: e.target.value})} />
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
-                  <input type="checkbox" id="editComisionActiva" checked={editingTerapeuta.comisionActiva} onChange={(e) => setEditingTerapeuta({...editingTerapeuta, comisionActiva: e.target.checked})} />
+                  <input type="checkbox" id="editComisionActiva" disabled={!isAdmin} checked={editingTerapeuta.comisionActiva} onChange={(e) => setEditingTerapeuta({...editingTerapeuta, comisionActiva: e.target.checked})} />
                   <label htmlFor="editComisionActiva" style={{ fontSize: "0.85rem" }}>¿Trabaja por Comisión (% del cobro)?</label>
                 </div>
                 {editingTerapeuta.comisionActiva ? (
                   <div>
                     <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Porcentaje de Comisión (%)*</label>
-                    <input type="number" required className="input-field" min="0" max="100" value={editingTerapeuta.comisionPorcentaje} onChange={(e) => setEditingTerapeuta({...editingTerapeuta, comisionPorcentaje: e.target.value})} />
+                    <input type="number" required disabled={!isAdmin} className="input-field" min="0" max="100" value={editingTerapeuta.comisionPorcentaje} onChange={(e) => setEditingTerapeuta({...editingTerapeuta, comisionPorcentaje: e.target.value})} />
                   </div>
                 ) : (
                   <div>
                     <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Salario Fijo Mensual ($)*</label>
-                    <input type="number" required className="input-field" min="0" value={editingTerapeuta.salarioFijo !== undefined ? editingTerapeuta.salarioFijo : 500} onChange={(e) => setEditingTerapeuta({...editingTerapeuta, salarioFijo: e.target.value})} />
+                    <input type="number" required disabled={!isAdmin} className="input-field" min="0" value={editingTerapeuta.salarioFijo !== undefined ? editingTerapeuta.salarioFijo : 500} onChange={(e) => setEditingTerapeuta({...editingTerapeuta, salarioFijo: e.target.value})} />
                   </div>
                 )}
                 
@@ -564,7 +564,7 @@ export default function AjustesApp() {
                 </div>
                 <div>
                   <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Costo Base ($)*</label>
-                  <input type="number" required className="input-field" value={editingServicio.costo} onChange={(e) => setEditingServicio({...editingServicio, costo: e.target.value})} />
+                  <input type="number" required disabled={!isAdmin} className="input-field" value={editingServicio.costo} onChange={(e) => setEditingServicio({...editingServicio, costo: e.target.value})} />
                 </div>
                 
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>

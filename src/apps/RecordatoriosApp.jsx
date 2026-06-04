@@ -151,23 +151,23 @@ export default function RecordatoriosApp() {
           pacienteNombre: c.pacienteNombre,
           representante: patient.representante,
           telefono: patient.telefono,
-          citasPorDia: {}
+          citas: []
         };
       }
-
-      const [cy, cm, cd] = c.fecha.split("-").map(Number);
-      const dateObj = new Date(cy, cm - 1, cd);
-      const dayIndex = dateObj.getDay();
-      const dayName = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][dayIndex];
-      const monthNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
-      const key = `${dayName} ${String(dateObj.getDate()).padStart(2, '0')} de ${monthNames[dateObj.getMonth()]}`;
-
-      if (!grouped[c.pacienteId].citasPorDia[key]) {
-        grouped[c.pacienteId].citasPorDia[key] = [];
-      }
-      grouped[c.pacienteId].citasPorDia[key].push({
+      
+      grouped[c.pacienteId].citas.push({
+        fecha: c.fecha,
         hora: c.horaInicio,
         terapeuta: therapist?.nombre || "Terapeuta"
+      });
+    });
+
+    // Sort chronologically
+    Object.values(grouped).forEach(item => {
+      item.citas.sort((a, b) => {
+        const dateComp = a.fecha.localeCompare(b.fecha);
+        if (dateComp !== 0) return dateComp;
+        return a.hora.localeCompare(b.hora);
       });
     });
 
@@ -197,38 +197,31 @@ export default function RecordatoriosApp() {
       relativeDay = "el día";
     }
     
-    return `Estimada *${item.representante}*,\n` +
-           `Le saludamos del Centro de Terapia Integral *MERAKI*.\n\n` +
-           `Le recordamos que *${item.pacienteNombre}* tiene programadas sus terapias para ${relativeDay} *${textDate}*:\n` +
+    return `¡Hola *${item.representante.toUpperCase()}*! 👋\n\n` +
+           `Te recordamos la cita de *${item.pacienteNombre.toUpperCase()}* en *MERAKI* 🧘‍♀️ para ${relativeDay} *${textDate.toUpperCase()}*:\n` +
            `${therapiesText}\n\n` +
            `Por favor, confirmar su asistencia respondiendo a este mensaje. Muchas gracias.`;
   };
 
   const getWeeklyMessage = (item) => {
+    const monthNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    const dayNames = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
+    
     let citasText = "";
-    Object.entries(item.citasPorDia).forEach(([dia, lista]) => {
-      const listStr = lista.map(l => `a las *${l.hora}* (con ${l.terapeuta})`).join(", ");
-      citasText += `- *${dia.toUpperCase()}:* ${listStr}\n`;
+    item.citas.forEach((cita, index) => {
+      const [cy, cm, cd] = cita.fecha.split("-").map(Number);
+      const dateObj = new Date(cy, cm - 1, cd);
+      const dayName = dayNames[dateObj.getDay()];
+      const mName = monthNames[cm - 1];
+      
+      citasText += `• Sesión ${index + 1}: *${dayName}, ${String(cd).padStart(2, '0')} de ${mName} del ${cy}*, a las *${cita.hora}* con *${cita.terapeuta.toUpperCase()}*.\n`;
     });
 
-    const [year, month, day] = selectedWeekStart.split("-").map(Number);
-    const startObj = new Date(year, month - 1, day);
-    const endObj = new Date(startObj);
-    endObj.setDate(startObj.getDate() + 6); // Sunday
-
-    const fmtDateSpanish = (dateObj) => {
-      const dayName = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][dateObj.getDay()];
-      const monthName = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"][dateObj.getMonth()];
-      return `${dayName} ${String(dateObj.getDate()).padStart(2, '0')} de ${monthName} del ${dateObj.getFullYear()}`;
-    };
-
-    const rangeText = `${fmtDateSpanish(startObj)} al ${fmtDateSpanish(endObj)}`;
-
-    return `Estimada *${item.representante}*,\n` +
-           `Le saludamos del Centro de Terapia Integral *MERAKI*.\n\n` +
-           `Le compartimos la agenda de terapias confirmadas para *${item.pacienteNombre}* para el período del *${rangeText}*:\n` +
+    return `¡Hola *${item.representante.toUpperCase()}*! 👋\n\n` +
+           `Te recordamos la cita de *${item.pacienteNombre.toUpperCase()}* en *MERAKI* 🧘‍♀️ para las siguientes citas:\n` +
            `${citasText}\n` +
-           `Recuerde que una vez aceptados los horarios, inasistencias injustificadas serán cobradas. Por favor, confírmenos su aceptación respondiendo a este mensaje.`;
+           `Por favor, llega *a tiempo* ⏳ para asegurar su atención. Según nuestras políticas, la inasistencia podría resultar en la *pérdida de su turno* y la necesidad de cancelarlo. Si surge alguna enfermedad o calamidad, te pedimos *justificarla con pruebas documentales* 📝, las cuales serán revisadas por nuestra administración.\n\n` +
+           `¡Te esperamos en *MERAKI*! ✨📌 Importante: Al no recibir respuesta a este mensaje, se asume que el horario ha sido aceptado. En caso de requerir reprogramación, es necesario notificar inmediatamente al momento de recibir el horario.`;
   };
 
   const getTargetDateText = () => {
@@ -487,7 +480,7 @@ export default function RecordatoriosApp() {
               if (activeTab === 'diario') {
                 citasSummary = item.terapias.map(t => `${t.hora} (${t.servicio})`).join(", ");
               } else {
-                citasSummary = Object.keys(item.citasPorDia).join(", ");
+                citasSummary = item.citas.map(c => `${c.fecha.substring(5)} ${c.hora}`).join(", ");
               }
 
               return (

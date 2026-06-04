@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { subscribeToCollection, addDocument, updateDocument, deleteDocument, getCollection } from "../db";
+import { useAuth } from "../context/AuthContext";
 import { Calendar as CalendarIcon, Clock, User, Sparkles, RefreshCw, Trash2, ArrowLeftRight, Check, AlertTriangle, MessageCircle } from "lucide-react";
 
 const DAYS_OF_WEEK = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
@@ -10,6 +11,9 @@ const TIME_SLOTS = [
 ];
 
 export default function AgendaApp() {
+  const { currentUser } = useAuth();
+  const isAdmin = currentUser?.rol === "administrador";
+
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [terapeutas, setTerapeutas] = useState([]);
@@ -21,6 +25,11 @@ export default function AgendaApp() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
+
+  // Justifications
+  const [justificacion, setJustificacion] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteJustificacion, setDeleteJustificacion] = useState("");
 
   // Form states
   const [newCita, setNewCita] = useState({
@@ -228,6 +237,9 @@ export default function AgendaApp() {
     const existing = getCitaForSlot(activeTerapeutaId, dateStr, timeStr);
     if (existing) {
       setSelectedCita(existing);
+      setJustificacion("");
+      setDeleteJustificacion("");
+      setShowDeleteConfirm(false);
       setShowEditModal(true);
     } else {
       setNewCita({
@@ -316,6 +328,33 @@ export default function AgendaApp() {
     const original = citas.find(c => c.id === selectedCita.id);
     const oldFecha = original ? original.fecha : selectedCita.fecha;
     const oldHora = original ? original.horaInicio : selectedCita.horaInicio;
+    const oldStatus = original ? original.estadoAsistencia : "";
+    const newStatus = selectedCita.estadoAsistencia;
+
+    if (newStatus === "falto_justificado" && oldStatus !== "falto_justificado" && !isAdmin) {
+      if (justificacion.trim().length < 15) {
+        alert("⚠️ Debes ingresar una justificación detallada (mínimo 15 caracteres) para marcar Falta Justificada.");
+        return;
+      }
+      try {
+        await addDocument("auditoria_agenda", {
+          tipoEvento: "falto_justificado",
+          citaId: selectedCita.id,
+          pacienteNombre: selectedCita.pacienteNombre,
+          terapeutaId: selectedCita.terapeutaId,
+          terapeutaNombre: terapeutas.find(t => t.id === selectedCita.terapeutaId)?.nombre || "",
+          fechaCita: selectedCita.fecha,
+          horaCita: selectedCita.horaInicio,
+          costoCita: Number(selectedCita.costo),
+          usuarioEmail: currentUser?.email || "desconocido",
+          usuarioNombre: currentUser?.nombre || "desconocido",
+          justificacion: justificacion.trim(),
+          fechaServidor: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error("Error al registrar auditoría:", err);
+      }
+    }
 
     try {
       await updateDocument("citas", selectedCita.id, {
@@ -339,6 +378,30 @@ export default function AgendaApp() {
 
   const handleDeleteCita = async (deleteMode) => {
     // deleteMode: 'only' = only this session, 'all' = this and future ones
+    if (!isAdmin) {
+      if (deleteJustificacion.trim().length < 15) {
+        alert("⚠️ Debes ingresar una justificación detallada (mínimo 15 caracteres) para eliminar esta cita.");
+        return;
+      }
+      try {
+        await addDocument("auditoria_agenda", {
+          tipoEvento: "eliminacion",
+          citaId: selectedCita.id,
+          pacienteNombre: selectedCita.pacienteNombre,
+          terapeutaId: selectedCita.terapeutaId,
+          terapeutaNombre: terapeutas.find(t => t.id === selectedCita.terapeutaId)?.nombre || "",
+          fechaCita: selectedCita.fecha,
+          horaCita: selectedCita.horaInicio,
+          costoCita: Number(selectedCita.costo),
+          usuarioEmail: currentUser?.email || "desconocido",
+          usuarioNombre: currentUser?.nombre || "desconocido",
+          justificacion: deleteJustificacion.trim(),
+          fechaServidor: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error("Error al registrar auditoría:", err);
+      }
+    }
     try {
       if (deleteMode === 'all' && selectedCita.esFija) {
         // find future recurring appointments for this patient + therapist + time
@@ -746,11 +809,15 @@ export default function AgendaApp() {
                 <input 
                   type="number" 
                   required 
+                  readOnly={!isAdmin}
+                  style={!isAdmin ? { backgroundColor: "#F3F4F6", cursor: "not-allowed" } : {}}
                   className="input-field" 
                   value={newCita.costo} 
                   onChange={(e) => setNewCita({...newCita, costo: e.target.value})} 
                 />
-                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Precio flexible. Modificable para esta sesión.</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                  {isAdmin ? "Precio flexible. Modificable para esta sesión." : "Precio bloqueado para recepción (administradoras pueden modificar)."}
+                </span>
               </div>
 
               <div style={{ display: "flex", gap: "16px", marginTop: "8px" }}>
@@ -802,6 +869,8 @@ export default function AgendaApp() {
                 <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Valor de la Sesión ($)</label>
                 <input 
                   type="number" 
+                  readOnly={!isAdmin}
+                  style={!isAdmin ? { backgroundColor: "#F3F4F6", cursor: "not-allowed" } : {}}
                   className="input-field" 
                   value={selectedCita.costo} 
                   onChange={(e) => setSelectedCita({...selectedCita, costo: e.target.value})} 
@@ -830,24 +899,99 @@ export default function AgendaApp() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
-                <button className="btn btn-secondary" onClick={() => setShowSwapModal(true)} style={{ flex: 1 }}>
-                  <ArrowLeftRight size={16} /> Intercambiar Turno
-                </button>
-                <button className="btn btn-danger" onClick={() => {
-                  if (selectedCita.esFija) {
-                    if (confirm("Esta cita es FIJA. ¿Quieres eliminar también todas las citas futuras?")) {
-                      handleDeleteCita('all');
-                    } else {
-                      handleDeleteCita('only');
-                    }
-                  } else {
-                    handleDeleteCita('only');
-                  }
-                }} style={{ display: "flex", justifyContent: "center", padding: "10px" }}>
-                  <Trash2 size={16} /> Eliminar
-                </button>
-              </div>
+              {selectedCita.estadoAsistencia === "falto_justificado" && !isAdmin && (
+                <div style={{ marginTop: "4px" }}>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--pink-dark)", display: "block", marginBottom: "4px" }}>
+                    Justificación de la Falta (Mínimo 15 caracteres)*
+                  </label>
+                  <textarea 
+                    required
+                    className="input-field" 
+                    rows={2}
+                    style={{ minHeight: "50px", resize: "none" }}
+                    placeholder="Ej: Presentó certificado médico del pediatra por gripe..."
+                    value={justificacion}
+                    onChange={(e) => setJustificacion(e.target.value)}
+                  />
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                    Caracteres actuales: {justificacion.length}/15
+                  </span>
+                </div>
+              )}
+
+              {showDeleteConfirm && !isAdmin ? (
+                <div style={{ backgroundColor: "#FEF2F2", border: "1px solid #FEE2E2", padding: "12px", borderRadius: "var(--radius-sm)", display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
+                  <span style={{ fontSize: "0.8rem", fontWeight: "bold", color: "#991B1B" }}>
+                    ⚠️ CONFIRMACIÓN DE ELIMINACIÓN
+                  </span>
+                  <label style={{ fontSize: "0.75rem", fontWeight: 500, color: "#991B1B" }}>
+                    Justificación obligatoria (Mínimo 15 caracteres)*
+                  </label>
+                  <textarea 
+                    required
+                    className="input-field"
+                    rows={2}
+                    style={{ minHeight: "50px", resize: "none", borderColor: "#FCA5A5" }}
+                    placeholder="Ej: El representante solicitó retirar la sesión permanente por viaje..."
+                    value={deleteJustificacion}
+                    onChange={(e) => setDeleteJustificacion(e.target.value)}
+                  />
+                  <span style={{ fontSize: "0.7rem", color: "#991B1B" }}>
+                    Caracteres actuales: {deleteJustificacion.length}/15
+                  </span>
+                  <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                    <button type="button" className="btn btn-secondary" style={{ padding: "6px 12px", fontSize: "0.8rem" }} onClick={() => setShowDeleteConfirm(false)}>
+                      Cancelar
+                    </button>
+                    <button 
+                      type="button"
+                      className="btn btn-danger" 
+                      style={{ padding: "6px 12px", fontSize: "0.8rem", backgroundColor: "#DC2626" }}
+                      disabled={deleteJustificacion.trim().length < 15}
+                      onClick={() => {
+                        if (selectedCita.esFija) {
+                          if (confirm("Esta cita es FIJA. ¿Quieres eliminar también todas las citas futuras?")) {
+                            handleDeleteCita('all');
+                          } else {
+                            handleDeleteCita('only');
+                          }
+                        } else {
+                          handleDeleteCita('only');
+                        }
+                      }}
+                    >
+                      Confirmar Eliminación
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+                  <button className="btn btn-secondary" onClick={() => setShowSwapModal(true)} style={{ flex: 1 }}>
+                    <ArrowLeftRight size={16} /> Intercambiar Turno
+                  </button>
+                  <button 
+                    className="btn btn-danger" 
+                    onClick={() => {
+                      if (!isAdmin) {
+                        setShowDeleteConfirm(true);
+                      } else {
+                        if (selectedCita.esFija) {
+                          if (confirm("Esta cita es FIJA. ¿Quieres eliminar también todas las citas futuras?")) {
+                            handleDeleteCita('all');
+                          } else {
+                            handleDeleteCita('only');
+                          }
+                        } else {
+                          handleDeleteCita('only');
+                        }
+                      }
+                    }} 
+                    style={{ display: "flex", justifyContent: "center", padding: "10px" }}
+                  >
+                    <Trash2 size={16} /> Eliminar
+                  </button>
+                </div>
+              )}
 
               <hr style={{ border: 0, borderTop: "1px solid var(--border-light)", margin: "8px 0" }} />
 

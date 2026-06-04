@@ -219,6 +219,10 @@ export default function CajaApp() {
   };
 
   const handleClearDebt = async (deuda) => {
+    if (!isAdmin) {
+      alert("Acceso denegado. Solo la administradora puede eliminar o depurar deudas.");
+      return;
+    }
     if (confirm(`¿Estás seguro de eliminar la deuda pendiente de $${deuda.saldoDebe} de ${deuda.representante}? Esto registrará un ajuste contable para saldar la cuenta.`)) {
       try {
         await addDocument("transacciones", {
@@ -578,14 +582,16 @@ export default function CajaApp() {
                       >
                         Registrar Pago
                       </button>
-                      <button 
-                        className="btn btn-danger"
-                        style={{ padding: "6px 10px", fontSize: "0.8rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                        onClick={() => handleClearDebt(d)}
-                        title="Eliminar / Depurar Deuda"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {isAdmin && (
+                        <button 
+                          className="btn btn-danger"
+                          style={{ padding: "6px 10px", fontSize: "0.8rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                          onClick={() => handleClearDebt(d)}
+                          title="Eliminar / Depurar Deuda"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
