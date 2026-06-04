@@ -28,10 +28,15 @@ export default function RecordatoriosApp() {
   const [assistantQueue, setAssistantQueue] = useState([]);
   const [countdown, setCountdown] = useState(0);
 
-  // Set default daily date to tomorrow
+  // Set default daily date to tomorrow (skipping Sunday)
   useEffect(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // Si mañana es domingo (0), saltamos automáticamente al lunes
+    if (tomorrow.getDay() === 0) {
+      tomorrow.setDate(tomorrow.getDate() + 1);
+    }
     setTargetDate(getLocalDateString(tomorrow));
 
     // Next Monday for weekly tab
@@ -199,6 +204,17 @@ export default function RecordatoriosApp() {
            `Recuerde que una vez aceptados los horarios, inasistencias injustificadas serán cobradas. Por favor, confírmenos su aceptación respondiendo a este mensaje.`;
   };
 
+  const getTargetDateText = () => {
+    if (!targetDate) return "";
+    try {
+      const [year, month, day] = targetDate.split("-").map(Number);
+      const dateObj = new Date(year, month - 1, day);
+      return dateObj.toLocaleDateString("es-ES", { weekday: 'long', day: 'numeric', month: 'long' });
+    } catch (e) {
+      return targetDate;
+    }
+  };
+
   const sendWhatsApp = (telefono, mensaje, patientId, dateKey) => {
     const formattedPhone = telefono.replace(/\s+/g, '').replace(/^0/, '593'); // Format for Ecuador (Meraki location: La Troncal / Guayaquil)
     const encodedText = encodeURIComponent(mensaje);
@@ -325,6 +341,25 @@ export default function RecordatoriosApp() {
           Agenda Semanal de Citas (Cierre de los Viernes)
         </button>
       </div>
+
+      {/* Alerta de Sábado para Recordatorios de Lunes */}
+      {activeTab === "diario" && new Date().getDay() === 6 && targetDate && new Date(targetDate + "T12:00:00").getDay() === 1 && (
+        <div style={{
+          backgroundColor: "var(--purple-light)",
+          color: "var(--purple-dark)",
+          padding: "12px 18px",
+          borderRadius: "var(--radius-sm)",
+          fontSize: "0.85rem",
+          fontWeight: "600",
+          marginBottom: "20px",
+          border: "1px solid var(--purple-pastel-soft)",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px"
+        }}>
+          💡 <span><strong>Recordatorios de Lunes:</strong> Hoy es sábado. Como el domingo es no laborable, el sistema seleccionó automáticamente las citas del **lunes ({getTargetDateText()})** para que puedas adelantar los envíos hoy.</span>
+        </div>
+      )}
 
       {/* Stats bar */}
       <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "20px" }}>
