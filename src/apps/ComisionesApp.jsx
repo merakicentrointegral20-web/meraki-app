@@ -131,7 +131,8 @@ export default function ComisionesApp() {
         motivo: bonusForm.motivo,
         fecha: bonusForm.fecha,
         mes: bonusForm.fecha.substring(0, 7), // format: YYYY-MM
-        registradoPor: currentUser?.nombre || "Recepción"
+        registradoPor: currentUser?.nombre || "Recepción",
+        estado: "pendiente"
       });
 
       setBonusForm({
@@ -318,6 +319,17 @@ export default function ComisionesApp() {
                           <span style={{ fontWeight: 500, color: "var(--text-muted)", marginRight: "8px" }}>{b.fecha}</span>
                           <strong style={{ color: "var(--text-main)" }}>{b.motivo}</strong>
                           <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginLeft: "8px" }}>(Registrado por: {b.registradoPor})</span>
+                          <span style={{ 
+                            fontSize: "0.72rem", 
+                            padding: "2px 6px", 
+                            borderRadius: "10px", 
+                            fontWeight: "bold", 
+                            backgroundColor: (b.estado === "procesado" ? "var(--purple-light)" : "#FEF3C7"), 
+                            color: (b.estado === "procesado" ? "var(--purple-dark)" : "#b45309"),
+                            marginLeft: "8px"
+                          }}>
+                            {b.estado === "procesado" ? "Procesado" : "Pendiente"}
+                          </span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                           <span style={{ fontWeight: 600, color: b.monto >= 0 ? "var(--purple-dark)" : "var(--pink-dark)" }}>

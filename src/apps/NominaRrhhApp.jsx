@@ -4,7 +4,8 @@ import { useAuth } from "../context/AuthContext";
 import { createPortal } from "react-dom";
 import { 
   Users, Calendar, Briefcase, FileText, CheckSquare, Plus, Trash2, Printer, Edit2, 
-  AlertCircle, Lock, Unlock, FileSpreadsheet, PlusCircle, UserPlus, Info, CheckCircle
+  AlertCircle, Lock, Unlock, FileSpreadsheet, PlusCircle, UserPlus, Info, CheckCircle,
+  DollarSign
 } from "lucide-react";
 
 export default function NominaRrhhApp() {
@@ -20,6 +21,8 @@ export default function NominaRrhhApp() {
   const [feriados, setFeriados] = useState([]);
   const [roles, setRoles] = useState([]);
   const [mesesCerrados, setMesesCerrados] = useState([]);
+  const [terapeutas, setTerapeutas] = useState([]);
+  const [bonosExtras, setBonosExtras] = useState([]);
 
   // Subscriptions
   useEffect(() => {
@@ -28,6 +31,8 @@ export default function NominaRrhhApp() {
     const unsubFer = subscribeToCollection("feriados", setFeriados);
     const unsubRol = subscribeToCollection("roles", setRoles);
     const unsubCerrados = subscribeToCollection("meses_cerrados", (data) => setMesesCerrados(data.map(d => d.key || d.id)));
+    const unsubTer = subscribeToCollection("terapeutas", setTerapeutas);
+    const unsubBonos = subscribeToCollection("bonos_extras", setBonosExtras);
 
     return () => {
       unsubEmp();
@@ -35,6 +40,8 @@ export default function NominaRrhhApp() {
       unsubFer();
       unsubRol();
       unsubCerrados();
+      unsubTer();
+      unsubBonos();
     };
   }, []);
 
@@ -49,6 +56,25 @@ export default function NominaRrhhApp() {
     }
   };
   const MN = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+  const getTherapistName = (id) => {
+    const t = terapeutas.find(x => x.id === id);
+    return t ? t.nombre : id;
+  };
+
+  const handleToggleBonoEstado = async (bono) => {
+    const nuevoEstado = (bono.estado || "pendiente") === "procesado" ? "pendiente" : "procesado";
+    try {
+      await setDocument("bonos_extras", bono.id, {
+        ...bono,
+        estado: nuevoEstado
+      });
+      alert(`Ajuste marcado como: ${nuevoEstado.toUpperCase()}`);
+    } catch (err) {
+      console.error(err);
+      alert("Error al actualizar el estado del ajuste: " + err.message);
+    }
+  };
 
   // --- 1. MODAL STATE FOR EMPLEADO ---
   const [showEmpModal, setShowEmpModal] = useState(false);
@@ -691,6 +717,12 @@ export default function NominaRrhhApp() {
     return { tN, tF, tTotal: tN + tF };
   }, [empleados, roles, nominaMonth, nominaYear, novedades, feriados]);
 
+  // Adjustments list for active month
+  const activeBonosPeriodo = useMemo(() => {
+    const mesStr = nominaYear + "-" + pad(nominaMonth);
+    return bonosExtras.filter(b => b.mes === mesStr || b.fecha?.startsWith(mesStr));
+  }, [bonosExtras, nominaMonth, nominaYear]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
       {/* Sub header for HR navigation */}
@@ -1142,6 +1174,75 @@ export default function NominaRrhhApp() {
                 </table>
               </div>
             </div>
+
+            {/* Control de Bonos y Descuentos del Período */}
+            <div className="glass" style={{ padding: "20px", borderRadius: "var(--radius-md)", marginTop: "24px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <div>
+                  <h4 style={{ fontWeight: 600, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <DollarSign size={18} color="var(--purple-base)"/> Control de Ajustes y Bonificaciones (Administración)
+                  </h4>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "2px" }}>
+                    Bonos y amonestaciones ingresados por la administradora para este período. Márcalos como "Procesado" para control de nómina.
+                  </p>
+                </div>
+              </div>
+
+              <div className="responsive-table-wrap">
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid var(--border-light)", color: "var(--text-muted)", fontSize: "0.8rem" }}>
+                      <th style={{ padding: "8px" }}>COLABORADOR</th>
+                      <th style={{ padding: "8px" }}>MOTIVO / DETALLE</th>
+                      <th style={{ padding: "8px" }}>FECHA</th>
+                      <th style={{ padding: "8px" }}>VALOR</th>
+                      <th style={{ padding: "8px" }}>REGISTRADO POR</th>
+                      <th style={{ padding: "8px", textAlign: "right" }}>ESTADO PAGO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeBonosPeriodo.map((b) => (
+                      <tr key={b.id} style={{ borderBottom: "1px solid var(--border-soft)", fontSize: "0.85rem", height: "45px" }}>
+                        <td style={{ padding: "8px" }}><strong>{getTherapistName(b.terapeutaId)}</strong></td>
+                        <td style={{ padding: "8px" }}>{b.motivo}</td>
+                        <td style={{ padding: "8px" }}>{fmtDate(b.fecha)}</td>
+                        <td style={{ padding: "8px", fontWeight: "bold", color: b.monto >= 0 ? "var(--purple-dark)" : "var(--pink-dark)" }}>
+                          {b.monto >= 0 ? `+$${Number(b.monto).toFixed(2)}` : `-$${Math.abs(Number(b.monto)).toFixed(2)}`}
+                        </td>
+                        <td style={{ padding: "8px", color: "var(--text-muted)", fontSize: "0.8rem" }}>{b.registradoPor || "Admin"}</td>
+                        <td style={{ padding: "8px", textAlign: "right" }}>
+                          <button 
+                            className="btn bts"
+                            onClick={() => handleToggleBonoEstado(b)}
+                            style={{
+                              backgroundColor: (b.estado || "pendiente") === "procesado" ? "var(--purple-light)" : "#FEF3C7",
+                              color: (b.estado || "pendiente") === "procesado" ? "var(--purple-dark)" : "#b45309",
+                              border: "none",
+                              padding: "4px 10px",
+                              borderRadius: "10px",
+                              fontWeight: "bold",
+                              cursor: "pointer",
+                              fontSize: "0.75rem",
+                              transition: "all 0.2s ease"
+                            }}
+                          >
+                            {(b.estado || "pendiente") === "procesado" ? "✓ Procesado" : "⏳ Pendiente"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {activeBonosPeriodo.length === 0 && (
+                      <tr>
+                        <td colSpan="6" style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)", fontStyle: "italic" }}>
+                          No hay bonificaciones ni descuentos registrados para este período.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         )}
 
