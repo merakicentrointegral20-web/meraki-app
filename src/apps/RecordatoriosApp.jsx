@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { subscribeToCollection, getCollection, updateDocument } from "../db";
-import { Send, CheckCircle2, AlertCircle, Play, ChevronRight, MessageSquare, Calendar } from "lucide-react";
+import { Send, CheckCircle2, AlertCircle, Play, ChevronRight, MessageSquare, Calendar, RefreshCw } from "lucide-react";
 
 const getLocalDateString = (date) => {
   const y = date.getFullYear();
@@ -265,6 +265,29 @@ export default function RecordatoriosApp() {
     saveSentState(dateKey, patientId);
   };
 
+  const handleResetSentState = (patientId) => {
+    const dateKey = activeTab === "diario" ? targetDate : selectedWeekStart;
+    const updated = { ...recordatoriosEnviados };
+    if (updated[dateKey]) {
+      delete updated[dateKey][patientId];
+      if (Object.keys(updated[dateKey]).length === 0) {
+        delete updated[dateKey];
+      }
+    }
+    setRecordatoriosEnviados(updated);
+    localStorage.setItem("meraki_sent_recordatorios", JSON.stringify(updated));
+  };
+
+  const handleResetAllSentState = () => {
+    if (confirm("¿Estás seguro de marcar todos los recordatorios de este período como PENDIENTES?")) {
+      const dateKey = activeTab === "diario" ? targetDate : selectedWeekStart;
+      const updated = { ...recordatoriosEnviados };
+      delete updated[dateKey];
+      setRecordatoriosEnviados(updated);
+      localStorage.setItem("meraki_sent_recordatorios", JSON.stringify(updated));
+    }
+  };
+
   // ASSISTANT SEQUENTIAL SYSTEM
   const startAssistant = (queue) => {
     if (queue.length === 0) {
@@ -354,6 +377,15 @@ export default function RecordatoriosApp() {
           >
             <Play size={16} /> Iniciar Envío en Secuencia ({countPending} pendientes)
           </button>
+          {countSent > 0 && (
+            <button 
+              className="btn btn-secondary"
+              onClick={handleResetAllSentState}
+              style={{ display: "flex", gap: "6px", alignItems: "center" }}
+            >
+              <RefreshCw size={14} /> Restablecer Todo
+            </button>
+          )}
         </div>
       </div>
 
@@ -503,9 +535,18 @@ export default function RecordatoriosApp() {
                   </td>
                   <td style={{ padding: "12px 8px" }}>
                     {isSent ? (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: "#10B981", fontSize: "0.8rem", fontWeight: 600 }}>
-                        <CheckCircle2 size={16} /> Enviado
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: "#10B981", fontSize: "0.8rem", fontWeight: 600 }}>
+                          <CheckCircle2 size={16} /> Enviado
+                        </span>
+                        <button 
+                          style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--text-muted)", display: "inline-flex", alignItems: "center" }}
+                          title="Restablecer a Pendiente"
+                          onClick={() => handleResetSentState(item.pacienteId)}
+                        >
+                          <RefreshCw size={12} />
+                        </button>
+                      </div>
                     ) : (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: "var(--purple-base)", fontSize: "0.8rem", fontWeight: 600 }}>
                         <AlertCircle size={16} /> Pendiente
@@ -518,7 +559,7 @@ export default function RecordatoriosApp() {
                       style={{ padding: "6px 12px", fontSize: "0.8rem" }}
                       onClick={() => sendWhatsApp(item.telefono, msg, item.pacienteId, currentDateKey)}
                     >
-                      <Send size={14} /> Enviar
+                      <Send size={14} /> {isSent ? 'Reenviar' : 'Enviar'}
                     </button>
                   </td>
                 </tr>
