@@ -10,12 +10,14 @@ import TareasApp from "./apps/TareasApp";
 import ComisionesApp from "./apps/ComisionesApp";
 import AjustesApp from "./apps/AjustesApp";
 import FinanzasDashboardApp from "./apps/FinanzasDashboardApp";
+import NominaRrhhApp from "./apps/NominaRrhhApp";
 
 // Lucide Icons
 import { 
   Users, Calendar, MessageSquare, DollarSign, 
   FileText, CheckSquare, Calculator, Settings, 
-  LogOut, Home, Lock, Bell, Sparkles, TrendingUp, AlertTriangle
+  LogOut, Home, Lock, Bell, Sparkles, TrendingUp, AlertTriangle,
+  Briefcase, Shield
 } from "lucide-react";
 
 import "./App.css";
@@ -48,6 +50,8 @@ function LoginScreen() {
     setPassword("");
     if (type === "admin") {
       setEmail("jeni@gmail.com");
+    } else if (type === "tono") {
+      setEmail("toño@gmail.com");
     } else {
       setEmail("joshua@gmail.com");
     }
@@ -90,7 +94,7 @@ function LoginScreen() {
           <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center" }}>
             <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", fontWeight: 600 }}>Selecciona tu perfil:</p>
             
-            <div style={{ display: "flex", gap: "30px", justifyContent: "center", width: "100%" }}>
+            <div style={{ display: "flex", gap: "16px", justifyContent: "center", width: "100%" }}>
               {/* Admin Profile */}
               <div 
                 onClick={() => handleSelectUser("admin")} 
@@ -108,6 +112,25 @@ function LoginScreen() {
                 </div>
                 <span style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "1rem" }}>Jeni</span>
                 <span style={{ color: "var(--purple-dark)", fontSize: "0.72rem", background: "var(--purple-pastel-soft)", padding: "2px 8px", borderRadius: "10px", fontWeight: 600 }}>Administración</span>
+              </div>
+
+              {/* Toño Profile */}
+              <div 
+                onClick={() => handleSelectUser("tono")} 
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", cursor: "pointer", flex: 1 }}
+                className="profile-card-hover"
+              >
+                <div style={{
+                  width: "80px", height: "80px", borderRadius: "50%",
+                  background: "linear-gradient(135deg, #7C3AED 0%, #a78bfa 100%)",
+                  display: "flex", justifyContent: "center", alignItems: "center",
+                  color: "white", boxShadow: "0 10px 15px -3px rgba(124, 58, 237, 0.25)",
+                  border: "3px solid white"
+                }}>
+                  <Briefcase size={32} />
+                </div>
+                <span style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "1rem" }}>Toño</span>
+                <span style={{ color: "#7C3AED", fontSize: "0.72rem", background: "var(--purple-pastel-soft)", padding: "2px 8px", borderRadius: "10px", fontWeight: 600 }}>R. R. H. H.</span>
               </div>
 
               {/* Recep Profile */}
@@ -135,17 +158,17 @@ function LoginScreen() {
             <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "var(--bg-secondary)", padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
               <div style={{
                 width: "40px", height: "40px", borderRadius: "50%",
-                background: selectedUser === "admin" 
+                background: selectedUser === "admin" || selectedUser === "tono"
                   ? "linear-gradient(135deg, var(--purple-base) 0%, #a78bfa 100%)" 
                   : "linear-gradient(135deg, var(--pink-base) 0%, #f472b6 100%)",
                 display: "flex", justifyContent: "center", alignItems: "center",
                 color: "white"
               }}>
-                {selectedUser === "admin" ? <Lock size={18} /> : <Users size={18} />}
+                {selectedUser === "admin" ? <Lock size={18} /> : selectedUser === "tono" ? <Briefcase size={18} /> : <Users size={18} />}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h4 style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "0.9rem" }}>
-                  {selectedUser === "admin" ? "Jeni (Administración)" : "Joshua (Recepción)"}
+                  {selectedUser === "admin" ? "Jeni (Administración)" : selectedUser === "tono" ? "Toño (Recursos Humanos)" : "Joshua (Recepción)"}
                 </h4>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.78rem", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                   {email}
@@ -187,6 +210,7 @@ function LoginScreen() {
 function MainDashboard() {
   const { currentUser, logout, isLocalDb } = useAuth();
   const [activeApp, setActiveApp] = useState("launchpad");
+  const [mainView, setMainView] = useState(currentUser?.email === "toño@gmail.com" ? "top" : "administracion");
   const [show4pmAlarm, setShow4pmAlarm] = useState(false);
   const [citas, setCitas] = useState([]);
   const [evaluaciones, setEvaluaciones] = useState([]);
@@ -258,10 +282,14 @@ function MainDashboard() {
     { id: "evaluaciones", title: "Evaluaciones", desc: "Control de informes", icon: <FileText size={28} />, bg: "var(--purple-pastel-soft)", color: "var(--purple-dark)", roles: ["administrador", "recepcionista"] },
     { id: "tareas", title: "Tareas y Calendario", desc: "Checklist y feriados", icon: <CheckSquare size={28} />, bg: "var(--pink-pastel-soft)", color: "var(--pink-dark)", roles: ["administrador", "recepcionista"] },
     { id: "comisiones", title: "Comisiones", desc: "Liquidación por %", icon: <Calculator size={28} />, bg: "var(--purple-pastel-soft)", color: "var(--purple-dark)", roles: ["administrador", "recepcionista"] },
-    { id: "ajustes", title: "Ajustes", desc: "Usuarios y tarifas", icon: <Settings size={28} />, bg: "var(--pink-pastel-soft)", color: "var(--pink-dark)", roles: ["administrador", "recepcionista"] }
+    { id: "ajustes", title: "Ajustes", desc: "Usuarios y tarifas", icon: <Settings size={28} />, bg: "var(--pink-pastel-soft)", color: "var(--pink-dark)", roles: ["administrador", "recepcionista"] },
+    { id: "nomina_rrhh", title: "Recursos Humanos", desc: "Nómina y Asistencia", icon: <Briefcase size={28} />, bg: "var(--purple-pastel-soft)", color: "var(--purple-dark)", roles: ["administrador"] }
   ];
 
-  const visibleApps = appModules.filter(app => app.roles.includes(currentUser.rol));
+  const visibleApps = appModules.filter(app => 
+    app.id !== "nomina_rrhh" && 
+    app.roles.includes(currentUser.rol)
+  );
 
   const renderActiveApp = () => {
     switch (activeApp) {
@@ -274,6 +302,7 @@ function MainDashboard() {
       case "comisiones": return <ComisionesApp />;
       case "ajustes": return <AjustesApp />;
       case "dashboard_finanzas": return <FinanzasDashboardApp />;
+      case "nomina_rrhh": return <NominaRrhhApp />;
       default: return null;
     }
   };
@@ -318,7 +347,7 @@ function MainDashboard() {
         display: "flex", justifyContent: "space-between", alignItems: "center",
         padding: "14px 30px", borderBottom: "1px solid var(--border-light)", zIndex: 10
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer" }} onClick={() => setActiveApp("launchpad")}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer" }} onClick={() => { setActiveApp("launchpad"); if (currentUser?.email === "toño@gmail.com") setMainView("top"); }}>
           <div style={{
             display: "inline-flex", padding: "8px", borderRadius: "50%",
             background: "linear-gradient(135deg, var(--purple-pastel-soft) 0%, var(--pink-pastel-soft) 100%)",
@@ -330,10 +359,15 @@ function MainDashboard() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          {activeApp !== "launchpad" && (
+          {(activeApp !== "launchpad" || mainView !== "top") && (
             <button 
               className="btn btn-secondary" 
-              onClick={() => setActiveApp("launchpad")}
+              onClick={() => {
+                setActiveApp("launchpad");
+                if (currentUser?.email === "toño@gmail.com") {
+                  setMainView("top");
+                }
+              }}
               style={{ padding: "8px 14px", fontSize: "0.85rem" }}
             >
               <Home size={16} /> Menú Principal
@@ -369,27 +403,31 @@ function MainDashboard() {
       {/* Main app body */}
       <main style={{ flex: 1, padding: "20px", display: "flex", flexDirection: "column" }}>
         {activeApp === "launchpad" ? (
-          /* Odoo Launchpad App grid view */
-          <div className="fade-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "40px 0" }}>
-            <h2 style={{ fontSize: "2rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "32px", letterSpacing: "-0.5px" }}>
-              Hola, {currentUser.nombre.split(" ")[0]} 👋
-            </h2>
-            <div className="responsive-grid" style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "24px",
-              width: "100%",
-              maxWidth: "800px",
-              padding: "20px"
-            }}>
-              {visibleApps.map((app) => (
+          currentUser?.email === "toño@gmail.com" && mainView === "top" ? (
+            /* Toño Directory Selector (Administración vs. Recursos Humanos) */
+            <div className="fade-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "40px 0" }}>
+              <h2 style={{ fontSize: "2rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "12px", letterSpacing: "-0.5px" }}>
+                Hola, Toño 👋
+              </h2>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.95rem", marginBottom: "32px", textAlign: "center" }}>
+                Selecciona el entorno en el que deseas trabajar hoy:
+              </p>
+              
+              <div className="responsive-grid" style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                gap: "24px",
+                width: "100%",
+                maxWidth: "600px",
+                padding: "20px"
+              }}>
+                {/* Option 1: Administracion */}
                 <div 
-                  key={app.id} 
-                  onClick={() => setActiveApp(app.id)}
+                  onClick={() => setMainView("administracion")}
                   style={{
                     backgroundColor: "white",
                     borderRadius: "var(--radius-lg)",
-                    padding: "24px 16px",
+                    padding: "32px 20px",
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
@@ -402,25 +440,116 @@ function MainDashboard() {
                   className="odoo-card-hover"
                 >
                   <div style={{
-                    width: "60px",
-                    height: "60px",
-                    borderRadius: "20px",
-                    backgroundColor: app.bg,
-                    color: app.color,
+                    width: "70px",
+                    height: "70px",
+                    borderRadius: "24px",
+                    backgroundColor: "var(--pink-pastel-soft)",
+                    color: "var(--pink-dark)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}>
+                    <Shield size={36} />
+                  </div>
+                  <h4 style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "1.15rem", marginBottom: "8px" }}>Administración</h4>
+                  <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", textAlign: "center" }}>
+                    Gestionar pacientes, agenda de citas, facturación y finanzas de la clínica.
+                  </span>
+                </div>
+
+                {/* Option 2: Recursos Humanos */}
+                <div 
+                  onClick={() => { setActiveApp("nomina_rrhh"); setMainView("top"); }}
+                  style={{
+                    backgroundColor: "white",
+                    borderRadius: "var(--radius-lg)",
+                    padding: "32px 20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    boxShadow: "var(--shadow-md)",
+                    border: "1px solid var(--border-soft)",
+                    transition: "all 0.25s ease"
+                  }}
+                  className="odoo-card-hover"
+                >
+                  <div style={{
+                    width: "70px",
+                    height: "70px",
+                    borderRadius: "24px",
+                    backgroundColor: "var(--purple-pastel-soft)",
+                    color: "var(--purple-dark)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    marginBottom: "16px",
+                    marginBottom: "20px",
                     boxShadow: "0 4px 6px -1px rgba(0,0,0,0.03)"
                   }}>
-                    {app.icon}
+                    <Briefcase size={36} />
                   </div>
-                  <h4 style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "1rem", marginBottom: "4px" }}>{app.title}</h4>
-                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textAlign: "center" }}>{app.desc}</span>
+                  <h4 style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "1.15rem", marginBottom: "8px" }}>Recursos Humanos</h4>
+                  <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", textAlign: "center" }}>
+                    Administrar personal administrativo, registrar asistencia, feriados y roles de pago.
+                  </span>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Odoo Launchpad App grid view */
+            <div className="fade-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "40px 0" }}>
+              <h2 style={{ fontSize: "2rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "32px", letterSpacing: "-0.5px" }}>
+                Hola, {currentUser.nombre.split(" ")[0]} 👋
+              </h2>
+              <div className="responsive-grid" style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "24px",
+                width: "100%",
+                maxWidth: "800px",
+                padding: "20px"
+              }}>
+                {visibleApps.map((app) => (
+                  <div 
+                    key={app.id} 
+                    onClick={() => setActiveApp(app.id)}
+                    style={{
+                      backgroundColor: "white",
+                      borderRadius: "var(--radius-lg)",
+                      padding: "24px 16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      boxShadow: "var(--shadow-md)",
+                      border: "1px solid var(--border-soft)",
+                      transition: "all 0.25s ease"
+                    }}
+                    className="odoo-card-hover"
+                  >
+                    <div style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "20px",
+                      backgroundColor: app.bg,
+                      color: app.color,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginBottom: "16px",
+                      boxShadow: "0 4px 6px -1px rgba(0,0,0,0.03)"
+                    }}>
+                      {app.icon}
+                    </div>
+                    <h4 style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "1rem", marginBottom: "4px" }}>{app.title}</h4>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textAlign: "center" }}>{app.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
         ) : (
           /* Single App full-screen view */
           <div className="glass fade-in" style={{

@@ -20,7 +20,8 @@ export const AuthProvider = ({ children }) => {
   // --- MOCK USERS ---
   const mockUsers = [
     { email: "jeni@gmail.com", uid: "uid_admin", nombre: "Administradora Meraki (Jeni)", rol: "administrador" },
-    { email: "joshua@gmail.com", uid: "uid_joshua", nombre: "Joshua (Recepción)", rol: "recepcionista" }
+    { email: "joshua@gmail.com", uid: "uid_joshua", nombre: "Joshua (Recepción)", rol: "recepcionista" },
+    { email: "toño@gmail.com", uid: "uid_tono", nombre: "Toño (Recursos Humanos)", rol: "administrador" }
   ];
 
   useEffect(() => {
@@ -86,13 +87,20 @@ export const AuthProvider = ({ children }) => {
       // Simulación de login en modo local
       return new Promise((resolve, reject) => {
         setTimeout(() => {
-          const user = mockUsers.find(u => u.email === email && password === (email.includes("jeni") ? "jeni2026" : "joshua2026"));
+          let validated = false;
+          const user = mockUsers.find(u => {
+            if (u.email !== email) return false;
+            if (email.includes("jeni")) return password === "jeni2026";
+            if (email.includes("joshua")) return password === "joshua2026";
+            if (email.includes("toño") || email.includes("tono")) return password === "toño2026" || password === "tono2026";
+            return false;
+          });
           if (user) {
             localStorage.setItem("meraki_logged_user", JSON.stringify(user));
             setCurrentUser(user);
             resolve(user);
           } else {
-            reject(new Error("Usuario o contraseña incorrectos. Usa jeni@gmail.com (clave: jeni2026) o joshua@gmail.com (clave: joshua2026)"));
+            reject(new Error("Usuario o contraseña incorrectos. Usa jeni@gmail.com (clave: jeni2026), toño@gmail.com (clave: toño2026) o joshua@gmail.com (clave: joshua2026)"));
           }
         }, 800);
       });
