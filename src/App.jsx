@@ -224,7 +224,49 @@ function MainDashboard() {
     };
   }, []);
 
-  // 4:00 PM Alarm logic check every 30 seconds
+  const playScandalousAlarm = () => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = "sawtooth"; 
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      const now = ctx.currentTime;
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.linearRampToValueAtTime(1200, now + 0.25);
+      osc.frequency.linearRampToValueAtTime(600, now + 0.5);
+      osc.frequency.linearRampToValueAtTime(1000, now + 0.75);
+      osc.frequency.linearRampToValueAtTime(800, now + 1.0);
+      
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.setValueAtTime(0.35, now + 0.85);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 1.0);
+      
+      osc.start(now);
+      osc.stop(now + 1.0);
+    } catch (e) {
+      console.warn("Audio Context blocked or failed:", e);
+    }
+  };
+
+  // Sound alarm effect
+  useEffect(() => {
+    if (show4pmAlarm) {
+      playScandalousAlarm();
+      const audioInterval = setInterval(() => {
+        playScandalousAlarm();
+      }, 1500);
+      return () => clearInterval(audioInterval);
+    }
+  }, [show4pmAlarm]);
+
+  // 3:00 PM Alarm logic check every 30 seconds
   useEffect(() => {
     if (currentUser?.rol !== "recepcionista") return;
 
@@ -232,8 +274,8 @@ function MainDashboard() {
       const now = new Date();
       const currentHour = now.getHours();
 
-      // Check if it's 4 PM or later
-      if (currentHour >= 16) {
+      // Check if it's 3 PM or later
+      if (currentHour >= 15) {
         // Find if we have appointments for tomorrow
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -310,7 +352,7 @@ function MainDashboard() {
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       
-      {/* 4:00 PM Alarm Banner Alert */}
+      {/* 3:00 PM Alarm Banner Alert */}
       {show4pmAlarm && (
         <div style={{
           backgroundColor: "#FCE8E6", color: "#A8200D", padding: "14px 20px", display: "flex",
@@ -319,7 +361,7 @@ function MainDashboard() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <Bell size={20} className="shake" />
-            <span>⏰ ¡ALERTA RECEPCIÓN! Son las 4:00 PM o más. Recuerda enviar los recordatorios de citas de mañana por WhatsApp.</span>
+            <span>⏰ ¡ALERTA RECEPCIÓN! Son las 3:00 PM o más. Recuerda enviar los recordatorios de citas de mañana por WhatsApp.</span>
           </div>
           <button className="btn btn-primary" onClick={() => { setActiveApp("recordatorios"); setShow4pmAlarm(false); }} style={{ padding: "6px 14px", fontSize: "0.8rem", backgroundColor: "#A8200D" }}>
             Enviar Ahora
