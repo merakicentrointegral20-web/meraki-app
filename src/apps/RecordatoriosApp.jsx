@@ -28,17 +28,10 @@ export default function RecordatoriosApp() {
   const [assistantQueue, setAssistantQueue] = useState([]);
   const [countdown, setCountdown] = useState(0);
 
-  // Set default daily date to tomorrow (skipping Sunday)
-  useEffect(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    // Si mañana es domingo (0), saltamos automáticamente al lunes
-    if (tomorrow.getDay() === 0) {
-      tomorrow.setDate(tomorrow.getDate() + 1);
-    }
-    setTargetDate(getLocalDateString(tomorrow));
+  const [isDateManuallyChanged, setIsDateManuallyChanged] = useState(false);
 
+  // Set default weekly date on load, and load saved state
+  useEffect(() => {
     // Next Monday for weekly tab
     const today = new Date();
     const day = today.getDay();
@@ -52,6 +45,30 @@ export default function RecordatoriosApp() {
       setRecordatoriosEnviados(JSON.parse(saved));
     }
   }, []);
+
+  // Set default daily date to next day with scheduled appointments
+  useEffect(() => {
+    if (citas.length === 0 || isDateManuallyChanged) return;
+
+    const target = new Date();
+    target.setDate(target.getDate() + 1); // Mañana
+    
+    // Buscamos en los próximos 7 días para encontrar el primer día que tenga citas programadas
+    for (let i = 0; i < 7; i++) {
+      const dateStr = getLocalDateString(target);
+      const hasCitas = citas.some(c => c.fecha === dateStr && c.estadoAsistencia !== "falto_justificado");
+      if (hasCitas) {
+        setTargetDate(dateStr);
+        return;
+      }
+      target.setDate(target.getDate() + 1);
+    }
+    
+    // Si no hay citas programadas en los próximos 7 días, por defecto dejamos mañana
+    const defaultTomorrow = new Date();
+    defaultTomorrow.setDate(defaultTomorrow.getDate() + 1);
+    setTargetDate(getLocalDateString(defaultTomorrow));
+  }, [citas, isDateManuallyChanged]);
 
   useEffect(() => {
     const unsubCitas = subscribeToCollection("citas", setCitas);
@@ -215,6 +232,14 @@ export default function RecordatoriosApp() {
     }
   };
 
+  const getIsSkippedDate = () => {
+    if (!targetDate) return false;
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = getLocalDateString(tomorrow);
+    return targetDate !== tomorrowStr;
+  };
+
   const sendWhatsApp = (telefono, mensaje, patientId, dateKey) => {
     const formattedPhone = telefono.replace(/\s+/g, '').replace(/^0/, '593'); // Format for Ecuador (Meraki location: La Troncal / Guayaquil)
     const encodedText = encodeURIComponent(mensaje);
@@ -288,7 +313,10 @@ export default function RecordatoriosApp() {
               className="input-field" 
               style={{ width: "160px" }}
               value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
+              onChange={(e) => {
+                setTargetDate(e.target.value);
+                setIsDateManuallyChanged(true);
+              }}
             />
           ) : (
             <input 
@@ -319,7 +347,10 @@ export default function RecordatoriosApp() {
       {/* Tabs */}
       <div style={{ display: "flex", gap: "12px", borderBottom: "2px solid var(--border-light)", marginBottom: "20px" }}>
         <button 
-          onClick={() => setActiveTab("diario")}
+          onClick={() => {
+            setActiveTab("diario");
+            setIsDateManuallyChanged(false);
+          }}
           style={{
             padding: "10px 20px", border: "none", background: "none", fontWeight: 500, cursor: "pointer",
             borderBottom: activeTab === "diario" ? "3px solid var(--purple-base)" : "3px solid transparent",
@@ -330,7 +361,10 @@ export default function RecordatoriosApp() {
           Recordatorios Diarios (1 Día Antes)
         </button>
         <button 
-          onClick={() => setActiveTab("semanal")}
+          onClick={() => {
+            setActiveTab("semanal");
+            setIsDateManuallyChanged(false);
+          }}
           style={{
             padding: "10px 20px", border: "none", background: "none", fontWeight: 500, cursor: "pointer",
             borderBottom: activeTab === "semanal" ? "3px solid var(--purple-base)" : "3px solid transparent",
@@ -342,8 +376,8 @@ export default function RecordatoriosApp() {
         </button>
       </div>
 
-      {/* Alerta de Sábado para Recordatorios de Lunes */}
-      {activeTab === "diario" && new Date().getDay() === 6 && targetDate && new Date(targetDate + "T12:00:00").getDay() === 1 && (
+      {/* Alerta de Salto de Agenda (para días no laborables o sin citas) */}
+      {activeTab === "diario" && getIsSkippedDate() && (
         <div style={{
           backgroundColor: "var(--purple-light)",
           color: "var(--purple-dark)",
@@ -357,7 +391,7 @@ export default function RecordatoriosApp() {
           alignItems: "center",
           gap: "8px"
         }}>
-          💡 <span><strong>Recordatorios de Lunes:</strong> Hoy es sábado. Como el domingo es no laborable, el sistema seleccionó automáticamente las citas del **lunes ({getTargetDateText()})** para que puedas adelantar los envíos hoy.</span>
+          💡 <span><strong>Salto de Agenda:</strong> El sistema seleccionó automáticamente el **{getTargetDateText()}** porque no hay citas programadas para fechas intermedias. ¡Puedes adelantar los envíos de este día hoy!</span>
         </div>
       )}
 
