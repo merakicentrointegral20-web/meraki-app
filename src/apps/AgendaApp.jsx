@@ -474,8 +474,32 @@ export default function AgendaApp() {
       return;
     }
 
+    const fmtDateSpanish = (dateStr) => {
+      if (!dateStr) return "";
+      const [year, month, day] = dateStr.split("-").map(Number);
+      const dateObj = new Date(year, month - 1, day);
+      const dayName = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][dateObj.getDay()];
+      const monthName = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"][month - 1];
+      return `${dayName} ${String(day).padStart(2, '0')} de ${monthName} del ${year}`;
+    };
+
+    // Calculate Sunday as end of week (selectedWeekStart is Monday)
+    const [sy, sm, sd] = selectedWeekStart.split("-").map(Number);
+    const startObj = new Date(sy, sm - 1, sd);
+    const endObj = new Date(startObj);
+    endObj.setDate(startObj.getDate() + 6); // Sunday
+    
+    const ey = endObj.getFullYear();
+    const em = String(endObj.getMonth() + 1).padStart(2, '0');
+    const ed = String(endObj.getDate()).padStart(2, '0');
+    const weekEndSundayStr = `${ey}-${em}-${ed}`;
+
+    const periodStr = `${fmtDateSpanish(selectedWeekStart)} al ${fmtDateSpanish(weekEndSundayStr)}`;
+
     // Build the message
-    let msg = `Hola *${therapist.nombre}*, te saluda MERAKI. Te compartimos tu agenda semanal para el período del *${selectedWeekStart}* al *${currentWeekEnd}*:\n\n`;
+    let msg = `Hola *${therapist.nombre}*, te saluda MERAKI. Te compartimos tu agenda semanal para el período del *${periodStr}*:\n\n`;
+
+    const monthNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
     // Group by day
     weekDays.forEach(d => {
@@ -484,7 +508,8 @@ export default function AgendaApp() {
         .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
 
       if (dayCitas.length > 0) {
-        msg += `*${d.name.toUpperCase()} ${d.dayNum}/${d.monthNum}:*\n`;
+        const mName = monthNames[d.monthNum - 1];
+        msg += `*${d.name.toUpperCase()} ${String(d.dayNum).padStart(2, '0')} DE ${mName.toUpperCase()}:*\n`;
         dayCitas.forEach(c => {
           msg += `• ${c.horaInicio} - ${c.horaFin}: ${c.pacienteNombre} (${c.servicioNombre})\n`;
         });

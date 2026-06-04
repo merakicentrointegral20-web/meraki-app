@@ -158,8 +158,9 @@ export default function RecordatoriosApp() {
       const [cy, cm, cd] = c.fecha.split("-").map(Number);
       const dateObj = new Date(cy, cm - 1, cd);
       const dayIndex = dateObj.getDay();
-      const dayName = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][dayIndex];
-      const key = `${dayName} ${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
+      const dayName = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][dayIndex];
+      const monthNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+      const key = `${dayName} ${String(dateObj.getDate()).padStart(2, '0')} de ${monthNames[dateObj.getMonth()]}`;
 
       if (!grouped[c.pacienteId].citasPorDia[key]) {
         grouped[c.pacienteId].citasPorDia[key] = [];
@@ -207,16 +208,25 @@ export default function RecordatoriosApp() {
     let citasText = "";
     Object.entries(item.citasPorDia).forEach(([dia, lista]) => {
       const listStr = lista.map(l => `a las *${l.hora}* (con ${l.terapeuta})`).join(", ");
-      citasText += `- *${dia}*: ${listStr}\n`;
+      citasText += `- *${dia.toUpperCase()}:* ${listStr}\n`;
     });
 
     const [year, month, day] = selectedWeekStart.split("-").map(Number);
-    const dateObj = new Date(year, month - 1, day);
-    const formattedWeekStart = dateObj.toLocaleDateString("es-ES", { day: 'numeric', month: 'long', year: 'numeric' });
+    const startObj = new Date(year, month - 1, day);
+    const endObj = new Date(startObj);
+    endObj.setDate(startObj.getDate() + 6); // Sunday
+
+    const fmtDateSpanish = (dateObj) => {
+      const dayName = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][dateObj.getDay()];
+      const monthName = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"][dateObj.getMonth()];
+      return `${dayName} ${String(dateObj.getDate()).padStart(2, '0')} de ${monthName} del ${dateObj.getFullYear()}`;
+    };
+
+    const rangeText = `${fmtDateSpanish(startObj)} al ${fmtDateSpanish(endObj)}`;
 
     return `Estimada *${item.representante}*,\n` +
            `Le saludamos del Centro de Terapia Integral *MERAKI*.\n\n` +
-           `Le compartimos la agenda de terapias confirmadas para *${item.pacienteNombre}* para la próxima semana (Semana del ${formattedWeekStart}):\n` +
+           `Le compartimos la agenda de terapias confirmadas para *${item.pacienteNombre}* para el período del *${rangeText}*:\n` +
            `${citasText}\n` +
            `Recuerde que una vez aceptados los horarios, inasistencias injustificadas serán cobradas. Por favor, confírmenos su aceptación respondiendo a este mensaje.`;
   };
