@@ -209,7 +209,8 @@ export default function RecordatoriosApp() {
     return `¡Hola *${item.representante.toUpperCase()}*! 👋\n\n` +
            `Te recordamos la cita de *${item.pacienteNombre.toUpperCase()}* en *MERAKI* 🧘‍♀️ para ${relativeDay} *${textDate}*:\n` +
            `${therapiesText}\n\n` +
-           `Por favor, confirma tu asistencia respondiendo a este mensaje. Muchas gracias.`;
+           `Por favor, llega *a tiempo* ⏳ para asegurar su atención. Según nuestras políticas, la inasistencia podría resultar en la *pérdida de su turno* y la necesidad de cancelarlo. Si surge alguna enfermedad o calamidad, te pedimos *justificarla con pruebas documentales* 📝, las cuales serán revisadas por nuestra administración.\n\n` +
+           `¡Te esperamos en *MERAKI*! ✨📌 Importante: Al no recibir respuesta a este mensaje, se asume que el horario ha sido aceptado. En caso de requerir reprogramación, es necesario notificar inmediatamente al momento de recibir el horario.`;
   };
 
   const getWeeklyMessage = (item) => {
