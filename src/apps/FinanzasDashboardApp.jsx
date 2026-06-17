@@ -262,8 +262,10 @@ export default function FinanzasDashboardApp() {
       };
     });
 
-    // General Operating Expenses
-    const totalExpenses = filteredGastos.reduce((acc, g) => acc + Number(g.monto), 0);
+    // General Operating Expenses (excluding Petty Cash Replenishments to avoid double-counting)
+    const totalExpenses = filteredGastos
+      .filter(g => g.categoria !== "Reposición de Caja Chica")
+      .reduce((acc, g) => acc + Number(g.monto), 0);
 
     // Group expenses by category
     const categories = ["Caja Chica", "Alquiler", "Servicios Públicos", "Materiales y Papelería", "Mantenimiento", "Otros"];

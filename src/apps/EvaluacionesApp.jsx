@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { subscribeToCollection, addDocument, updateDocument, getCollection } from "../db";
+import { subscribeToCollection, addDocument, updateDocument, getCollection, registrarLog } from "../db";
 import { useAuth } from "../context/AuthContext";
-import { FileText, Calendar, Clock, AlertTriangle, ShieldCheck, History, Edit, Plus, X, User, MessageCircle } from "lucide-react";
+import { FileText, Calendar, Clock, AlertTriangle, ShieldCheck, History, Edit, Plus, X, User, MessageCircle, Search } from "lucide-react";
 
 export default function EvaluacionesApp() {
   const { currentUser } = useAuth();
@@ -12,11 +12,19 @@ export default function EvaluacionesApp() {
   const [auditorias, setAuditorias] = useState([]);
 
   const todayStr = new Date().toLocaleDateString("en-CA");
-  const overdueEvaluations = evaluaciones.filter(ev => 
-    (ev.estado === "en_sesion" || ev.estado === "redaccion") && 
-    ev.fechaAcordadaRecep && 
-    ev.fechaAcordadaRecep < todayStr
-  );
+  const [activeTab, setActiveTab] = useState("activas");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterTerapeuta, setFilterTerapeuta] = useState("todos");
+  const [filterEstado, setFilterEstado] = useState("todos");
+
+  const activeOverdueEvaluations = evaluaciones.filter(ev => {
+    if (ev.estado === "entregado") return false;
+    const isOverdueAcordada = (ev.estado === "en_sesion" || ev.estado === "redaccion" || ev.estado === "recibido") && 
+                               ev.fechaAcordadaRecep && 
+                               ev.fechaAcordadaRecep < todayStr;
+    const isOverdueFin = ev.estado === "redaccion" && getElapsedDays(ev) > 5;
+    return isOverdueAcordada || isOverdueFin;
+  });
   
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -71,7 +79,7 @@ export default function EvaluacionesApp() {
 
   const checkFueraDeTiempo = (ev) => {
     const days = getElapsedDays(ev);
-    return days >= 11;
+    return days >= 6;
   };
 
   const handleOpenEditModal = (ev) => {
@@ -185,9 +193,36 @@ export default function EvaluacionesApp() {
     }
   };
 
+  const sortedEvaluaciones = [...evaluaciones].sort((a, b) => {
+    const numA = parseInt(a.id.replace(/\D/g, ""), 10) || 0;
+    const numB = parseInt(b.id.replace(/\D/g, ""), 10) || 0;
+    return numB - numA;
+  });
+
+  const filteredEvaluations = sortedEvaluaciones.filter(ev => {
+    const matchesTab = activeTab === "activas" ? ev.estado !== "entregado" : ev.estado === "entregado";
+    const matchesSearch = 
+      ev.nombrePaciente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ev.id?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTerapeuta = filterTerapeuta === "todos" ? true : ev.terapeutaId === filterTerapeuta;
+    const matchesEstado = filterEstado === "todos" ? true : ev.estado === filterEstado;
+    return matchesTab && matchesSearch && matchesTerapeuta && matchesEstado;
+  });
+
+  const handleStatusCardClick = (status) => {
+    if (status === "entregado") {
+      setActiveTab("entregadas");
+      setFilterEstado(filterEstado === "entregado" ? "todos" : "entregado");
+    } else {
+      setActiveTab("activas");
+      setFilterEstado(filterEstado === status ? "todos" : status);
+    }
+  };
+
   return (
     <div className="fade-in" style={{ padding: "20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+      {/* CABECERA PRINCIPAL */}
+      <div className="responsive-flex" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
         <div>
           <h2 style={{ color: "var(--purple-dark)", fontWeight: 600 }}>Seguimiento de Evaluaciones</h2>
           <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Control de entrega de informes clínicos y cumplimiento de plazos.</p>
@@ -202,144 +237,493 @@ export default function EvaluacionesApp() {
         </div>
       </div>
 
-      {overdueEvaluations.length > 0 && (
-        <div style={{
-          backgroundColor: "#FDF2F2", color: "#9B1C1C", padding: "14px 20px", borderRadius: "var(--radius-md)",
-          border: "1px solid #FDE8E8", marginBottom: "20px", display: "flex", gap: "10px", alignItems: "center"
-        }}>
-          <AlertTriangle size={20} color="#9B1C1C" className="shake" />
-          <div>
-            <strong>⚠️ Alerta de Entrega Expirada:</strong> Se registran {overdueEvaluations.length} evaluaciones que han excedido su Fecha Acordada de entrega. Por favor, solicite a los terapeutas correspondientes redactar e ingresar los informes.
+      {/* TARJETAS DE ESTADÍSTICAS INTERACTIVAS */}
+      <div style={{
+        display: "flex",
+        gap: "16px",
+        flexWrap: "wrap",
+        marginBottom: "24px"
+      }}>
+        {/* En Sesiones */}
+        <div 
+          onClick={() => handleStatusCardClick("en_sesion")}
+          style={{
+            backgroundColor: "white",
+            padding: "16px 20px",
+            borderRadius: "var(--radius-md)",
+            borderTop: "4px solid var(--purple-base)",
+            flex: "1 1 200px",
+            boxShadow: filterEstado === "en_sesion" ? "0 0 0 2px var(--purple-base), var(--shadow-md)" : "var(--shadow-sm)",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            transform: filterEstado === "en_sesion" ? "translateY(-2px)" : "none"
+          }}
+          className="table-row-hover"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 500 }}>En Sesiones</span>
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--purple-base)" }}></div>
+          </div>
+          <div style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text-main)", marginTop: "8px" }}>
+            {evaluaciones.filter(e => e.estado === "en_sesion").length}
           </div>
         </div>
-      )}
 
-      {/* Grid of statuses (Odoo style kanban header) */}
-      <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "20px" }}>
-        {["en_sesion", "redaccion", "recibido", "entregado"].map(state => {
-          const count = evaluaciones.filter(e => e.estado === state).length;
-          const label = state === "en_sesion" ? "En Sesiones" : state === "redaccion" ? "En Redacción (10d)" : state === "recibido" ? "En Recepción" : "Entregado a Padres";
-          const borderC = state === "en_sesion" ? "var(--purple-base)" : state === "redaccion" ? "#D97706" : state === "recibido" ? "#2563EB" : "#10B981";
-          return (
-            <div key={state} className="glass" style={{ borderRadius: "var(--radius-sm)", padding: "14px", borderTop: `4px solid ${borderC}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>{label}</span>
-                <div style={{ fontSize: "1.4rem", fontWeight: 600, color: "var(--text-main)", marginTop: "4px" }}>{count}</div>
-              </div>
-            </div>
-          );
-        })}
+        {/* En Redacción */}
+        <div 
+          onClick={() => handleStatusCardClick("redaccion")}
+          style={{
+            backgroundColor: "white",
+            padding: "16px 20px",
+            borderRadius: "var(--radius-md)",
+            borderTop: "4px solid #F59E0B",
+            flex: "1 1 200px",
+            boxShadow: filterEstado === "redaccion" ? "0 0 0 2px #F59E0B, var(--shadow-md)" : "var(--shadow-sm)",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            transform: filterEstado === "redaccion" ? "translateY(-2px)" : "none"
+          }}
+          className="table-row-hover"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 500 }}>En Redacción (Informes)</span>
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#F59E0B" }}></div>
+          </div>
+          <div style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text-main)", marginTop: "8px" }}>
+            {evaluaciones.filter(e => e.estado === "redaccion").length}
+          </div>
+        </div>
+
+        {/* Listos en Recepción */}
+        <div 
+          onClick={() => handleStatusCardClick("recibido")}
+          style={{
+            backgroundColor: "white",
+            padding: "16px 20px",
+            borderRadius: "var(--radius-md)",
+            borderTop: "4px solid #3B82F6",
+            flex: "1 1 200px",
+            boxShadow: filterEstado === "recibido" ? "0 0 0 2px #3B82F6, var(--shadow-md)" : "var(--shadow-sm)",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            transform: filterEstado === "recibido" ? "translateY(-2px)" : "none"
+          }}
+          className="table-row-hover"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 500 }}>Listos en Recepción</span>
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#3B82F6" }}></div>
+          </div>
+          <div style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text-main)", marginTop: "8px" }}>
+            {evaluaciones.filter(e => e.estado === "recibido").length}
+          </div>
+        </div>
+
+        {/* Entregados a Padres */}
+        <div 
+          onClick={() => handleStatusCardClick("entregado")}
+          style={{
+            backgroundColor: "white",
+            padding: "16px 20px",
+            borderRadius: "var(--radius-md)",
+            borderTop: "4px solid #10B981",
+            flex: "1 1 200px",
+            boxShadow: filterEstado === "entregado" ? "0 0 0 2px #10B981, var(--shadow-md)" : "var(--shadow-sm)",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            transform: filterEstado === "entregado" ? "translateY(-2px)" : "none"
+          }}
+          className="table-row-hover"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 500 }}>Entregados a Padres</span>
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#10B981" }}></div>
+          </div>
+          <div style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text-main)", marginTop: "8px" }}>
+            {evaluaciones.filter(e => e.estado === "entregado").length}
+          </div>
+        </div>
       </div>
 
-      {/* Main Evaluations Table */}
-      <div className="glass" style={{ borderRadius: "var(--radius-md)", padding: "20px", boxShadow: "var(--shadow-sm)" }}>
-        <div className="responsive-table-wrap">
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-          <thead>
-            <tr style={{ borderBottom: "2px solid var(--border-light)", color: "var(--text-muted)", fontSize: "0.85rem" }}>
-              <th style={{ padding: "12px 8px" }}>ID</th>
-              <th style={{ padding: "12px 8px" }}>PACIENTE</th>
-              <th style={{ padding: "12px 8px" }}>EDAD</th>
-              <th style={{ padding: "12px 8px" }}>TIPO</th>
-              <th style={{ padding: "12px 8px" }}>TERAPEUTA</th>
-              <th style={{ padding: "12px 8px" }}>DIAS TRANSCURRIDOS</th>
-              <th style={{ padding: "12px 8px" }}>ESTADO</th>
-              <th style={{ padding: "12px 8px" }}>INDICADOR</th>
-              <th style={{ padding: "12px 8px", textAlign: "right" }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {evaluaciones.map((ev) => {
-              const days = getElapsedDays(ev);
-              const isLate = checkFueraDeTiempo(ev);
-              const therapist = terapeutas.find(t => t.id === ev.terapeutaId);
-              const isOverdueAcordada = (ev.estado === "en_sesion" || ev.estado === "redaccion") && ev.fechaAcordadaRecep && ev.fechaAcordadaRecep < todayStr;
-              
-              return (
-                <tr key={ev.id} style={{ borderBottom: "1px solid var(--border-soft)", height: "55px" }}>
-                  <td style={{ padding: "12px 8px", fontWeight: 600, color: "var(--purple-dark)" }}>{ev.id}</td>
-                  <td style={{ padding: "12px 8px", fontWeight: 500 }}>{ev.nombrePaciente}</td>
-                  <td style={{ padding: "12px 8px", color: "var(--text-muted)", fontSize: "0.85rem" }}>{ev.edad}</td>
-                  <td style={{ padding: "12px 8px" }}>{ev.tipo}</td>
-                  <td style={{ padding: "12px 8px", color: "var(--text-muted)" }}>{therapist?.nombre || "Terapeuta"}</td>
-                  <td style={{ padding: "12px 8px", fontWeight: 500 }}>
-                    {ev.fechaFin ? `${days} días` : "No terminada"}
-                  </td>
-                  <td style={{ padding: "12px 8px" }}>
-                    <span style={{
-                      padding: "4px 8px", borderRadius: "20px", fontSize: "0.75rem", fontWeight: 600,
-                      backgroundColor: ev.estado === "en_sesion" ? "var(--purple-light)" : ev.estado === "redaccion" ? "#FEF3C7" : ev.estado === "recibido" ? "#DBEAFE" : "#D1FAE5",
-                      color: ev.estado === "en_sesion" ? "var(--purple-dark)" : ev.estado === "redaccion" ? "#B45309" : ev.estado === "recibido" ? "#1E40AF" : "#065F46"
-                    }}>
-                      {ev.estado === "en_sesion" ? "EN SESION" : ev.estado === "redaccion" ? "REDACCIÓN" : ev.estado === "recibido" ? "RECIBIDO" : "ENTREGADO"}
-                    </span>
-                  </td>
-                  <td style={{ padding: "12px 8px" }}>
-                    {isOverdueAcordada ? (
-                      <span style={{ color: "var(--pink-dark)", backgroundColor: "var(--pink-light)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "bold", display: "inline-flex", gap: "4px", alignItems: "center", animation: "pulseSoft 2s infinite" }}>
-                        <AlertTriangle size={12} /> EXCEDIDA ({ev.fechaAcordadaRecep})
-                      </span>
-                    ) : ev.estado === "en_sesion" || ev.estado === "redaccion" ? (
-                      <span style={{ color: "var(--purple-dark)", backgroundColor: "var(--purple-light)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "bold", display: "inline-flex", gap: "4px", alignItems: "center" }}>
-                        <Clock size={12} /> EN PLAZO (Límite: {ev.fechaAcordadaRecep || "N/A"})
-                      </span>
+      {/* DISEÑO EN DOS COLUMNAS FLEXIBLES */}
+      <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-start" }}>
+        
+        {/* COLUMNA IZQUIERDA: LISTADO PRINCIPAL (Filtros y Tabla) */}
+        <div style={{ 
+          flex: activeTab === "activas" ? "2.3 1 650px" : "1 1 100%", 
+          minWidth: 0,
+          display: "flex", 
+          flexDirection: "column", 
+          gap: "16px" 
+        }}>
+          
+          {/* BARRA DE FILTROS */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+            {/* Pestañas */}
+            <div style={{ display: "flex", gap: "4px", backgroundColor: "#F3F4F6", padding: "4px", borderRadius: "8px" }}>
+              <button
+                onClick={() => { setActiveTab("activas"); setFilterEstado("todos"); }}
+                style={{
+                  padding: "6px 16px",
+                  border: "none",
+                  borderRadius: "6px",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  backgroundColor: activeTab === "activas" ? "white" : "transparent",
+                  color: activeTab === "activas" ? "var(--purple-dark)" : "var(--text-muted)",
+                  boxShadow: activeTab === "activas" ? "0 1px 3px rgba(0,0,0,0.1)" : "none"
+                }}
+              >
+                Evaluaciones Activas ({evaluaciones.filter(e => e.estado !== "entregado").length})
+              </button>
+              <button
+                onClick={() => { setActiveTab("entregadas"); setFilterEstado("todos"); }}
+                style={{
+                  padding: "6px 16px",
+                  border: "none",
+                  borderRadius: "6px",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  backgroundColor: activeTab === "entregadas" ? "white" : "transparent",
+                  color: activeTab === "entregadas" ? "var(--purple-dark)" : "var(--text-muted)",
+                  boxShadow: activeTab === "entregadas" ? "0 1px 3px rgba(0,0,0,0.1)" : "none"
+                }}
+              >
+                Historial de Entregas ({evaluaciones.filter(e => e.estado === "entregado").length})
+              </button>
+            </div>
+
+            {/* Búsqueda y Terapeuta */}
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", flex: 1, justifyContent: "flex-end" }}>
+              <div style={{ position: "relative", minWidth: "220px" }}>
+                <Search style={{ position: "absolute", left: "10px", top: "9px", color: "var(--text-muted)" }} size={16} />
+                <input
+                  type="text"
+                  placeholder="Buscar por paciente o ID..."
+                  className="input-field"
+                  style={{ paddingLeft: "32px", fontSize: "0.85rem", height: "34px", margin: 0 }}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+
+              <select
+                className="input-field"
+                style={{ width: "180px", fontSize: "0.85rem", height: "34px", margin: 0 }}
+                value={filterTerapeuta}
+                onChange={(e) => setFilterTerapeuta(e.target.value)}
+              >
+                <option value="todos">Todos los Terapeutas</option>
+                {terapeutas
+                  .filter(t => !t.nombre.includes("Recepción") && !t.nombre.includes("Recepcion") && !t.nombre.includes("Josua") && !t.nombre.includes("Joshua"))
+                  .map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* TABLA PRINCIPAL */}
+          <div className="glass" style={{ borderRadius: "var(--radius-md)", padding: "20px", boxShadow: "var(--shadow-sm)" }}>
+            <div className="responsive-table-wrap">
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid var(--border-light)", color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                    <th style={{ padding: "12px 8px" }}>ID</th>
+                    <th style={{ padding: "12px 8px" }}>PACIENTE</th>
+                    <th style={{ padding: "12px 8px" }}>EDAD</th>
+                    <th style={{ padding: "12px 8px" }}>TIPO</th>
+                    <th style={{ padding: "12px 8px" }}>TERAPEUTA</th>
+                    {activeTab === "activas" ? (
+                      <>
+                        <th style={{ padding: "12px 8px" }}>ESTADO</th>
+                        <th style={{ padding: "12px 8px" }}>DÍAS TRANSCURRIDOS</th>
+                        <th style={{ padding: "12px 8px" }}>FECHA LÍMITE</th>
+                      </>
                     ) : (
-                      isLate ? (
-                        <span style={{ color: "var(--pink-dark)", backgroundColor: "var(--pink-light)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "bold", display: "inline-flex", gap: "4px", alignItems: "center" }}>
-                          <AlertTriangle size={12} /> FUERA DE TIEMPO
-                        </span>
-                      ) : (
-                        <span style={{ color: "#065F46", backgroundColor: "#D1FAE5", padding: "4px 8px", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "bold", display: "inline-flex", gap: "4px", alignItems: "center" }}>
-                          <ShieldCheck size={12} /> ENTREGADA A TIEMPO
-                        </span>
-                      )
+                      <>
+                        <th style={{ padding: "12px 8px" }}>RECEPCIÓN</th>
+                        <th style={{ padding: "12px 8px" }}>ENTREGA A PADRES</th>
+                        <th style={{ padding: "12px 8px" }}>PLAZO</th>
+                      </>
                     )}
-                  </td>
-                   <td style={{ padding: "12px 8px", textAlign: "right" }}>
-                     <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", alignItems: "center" }}>
-                       {therapist?.telefono ? (
-                         <button
-                           className="btn"
-                           style={{ padding: "4px 8px", fontSize: "0.8rem", backgroundColor: "#D1FAE5", color: "#065F46", border: "1px solid #A7F3D0" }}
-                           onClick={() => {
-                             const msg = `Hola ${therapist.nombre}, te saluda MERAKI. Tienes asignada la evaluación de ${ev.nombrePaciente} (${ev.tipo}). Recuerda que el informe escrito debe ser entregado en recepción a los 10 días de haber concluido la evaluación. La fecha máxima de entrega acordada es el ${ev.fechaAcordadaRecep || "N/A"}. ¡Muchas gracias!`;
-                             const url = `https://api.whatsapp.com/send?phone=${therapist.telefono.replace(/[^0-9]/g, "")}&text=${encodeURIComponent(msg)}`;
-                             window.open(url, "_blank");
-                           }}
-                           title="Notificar asignación de evaluación por WhatsApp"
-                         >
-                           <MessageCircle size={14} /> Alerta
-                         </button>
-                       ) : (
-                         <button
-                           className="btn"
-                           style={{ padding: "4px 8px", fontSize: "0.8rem", backgroundColor: "#F3F4F6", color: "var(--text-muted)", border: "1px solid var(--border-light)", cursor: "not-allowed" }}
-                           disabled
-                           title="Configure el celular del terapeuta en Ajustes para enviar alerta"
-                         >
-                           <MessageCircle size={14} /> Alerta
-                         </button>
-                       )}
-                       <button 
-                         className="btn btn-secondary" 
-                         style={{ padding: "4px 8px", fontSize: "0.8rem" }}
-                         onClick={() => handleOpenEditModal(ev)}
-                       >
-                         <Edit size={14} /> Editar
-                       </button>
-                     </div>
-                   </td>
-                </tr>
-              );
-            })}
-            {evaluaciones.length === 0 && (
-              <tr>
-                <td colSpan="9" style={{ padding: "30px", textAlign: "center", color: "var(--text-muted)" }}>No hay procesos de evaluación activos.</td>
-              </tr>
-            )}
-          </tbody>
-          </table>
+                    <th style={{ padding: "12px 8px", textAlign: "right" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEvaluations.map((ev) => {
+                    const days = getElapsedDays(ev);
+                    const isLate = checkFueraDeTiempo(ev);
+                    const therapist = terapeutas.find(t => t.id === ev.terapeutaId);
+                    const isOverdueAcordada = (ev.estado === "en_sesion" || ev.estado === "redaccion") && ev.fechaAcordadaRecep && ev.fechaAcordadaRecep < todayStr;
+                    
+                    const patient = pacientes.find(p => p.id === ev.pacienteId);
+                    const ageStr = patient ? calculateAge(patient.fechaNacimiento) : (ev.edad || "N/A");
+
+                    return (
+                      <tr key={ev.id} style={{ borderBottom: "1px solid var(--border-soft)", height: "55px" }} className="table-row-hover">
+                        <td style={{ padding: "12px 8px", fontWeight: 600, color: "var(--purple-dark)" }}>{ev.id}</td>
+                        <td style={{ padding: "12px 8px", fontWeight: 500 }}>{ev.nombrePaciente}</td>
+                        <td style={{ padding: "12px 8px", fontSize: "0.85rem", color: "var(--text-muted)" }}>{ageStr}</td>
+                        <td style={{ padding: "12px 8px", fontSize: "0.85rem", color: "var(--text-main)" }}>{ev.tipo}</td>
+                        <td style={{ padding: "12px 8px", color: "var(--text-muted)" }}>{therapist?.nombre || "Terapeuta"}</td>
+                        
+                        {activeTab === "activas" ? (
+                          <>
+                            <td style={{ padding: "12px 8px" }}>
+                              <span style={{
+                                padding: "4px 8px", borderRadius: "20px", fontSize: "0.75rem", fontWeight: 600,
+                                backgroundColor: ev.estado === "en_sesion" ? "var(--purple-light)" : ev.estado === "redaccion" ? "#FEF3C7" : "#DBEAFE",
+                                color: ev.estado === "en_sesion" ? "var(--purple-dark)" : ev.estado === "redaccion" ? "#B45309" : "#1E40AF"
+                              }}>
+                                {ev.estado === "en_sesion" ? "EN SESIÓN" : ev.estado === "redaccion" ? "REDACCIÓN" : "EN RECEPCIÓN"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "12px 8px", fontWeight: 500, fontSize: "0.85rem" }}>
+                              {ev.fechaFin ? (
+                                <span style={{ color: ev.estado === "redaccion" && days > 5 ? "#EF4444" : "inherit" }}>
+                                  {days} días desde fin
+                                </span>
+                              ) : (
+                                <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>En sesiones</span>
+                              )}
+                            </td>
+                            <td style={{ padding: "12px 8px", fontSize: "0.85rem" }}>
+                              {ev.fechaAcordadaRecep ? (
+                                <span style={{
+                                  color: isOverdueAcordada ? "#EF4444" : "var(--text-main)",
+                                  fontWeight: isOverdueAcordada ? 600 : "normal"
+                                }}>
+                                  {ev.fechaAcordadaRecep}
+                                  {isOverdueAcordada && " (Vencido)"}
+                                </span>
+                              ) : (
+                                <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Sin definir</span>
+                              )}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td style={{ padding: "12px 8px", fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                              {ev.fechaRealRecep || "N/A"}
+                            </td>
+                            <td style={{ padding: "12px 8px", fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                              {ev.fechaEntregaPadre || "Pendiente"}
+                            </td>
+                            <td style={{ padding: "12px 8px" }}>
+                              {isLate ? (
+                                <span style={{ color: "var(--text-muted)", fontSize: "0.8rem", display: "inline-flex", gap: "4px", alignItems: "center" }}>
+                                  <AlertTriangle size={12} color="#F59E0B" /> Entregado con retraso
+                                </span>
+                              ) : (
+                                <span style={{ color: "#065F46", fontSize: "0.8rem", display: "inline-flex", gap: "4px", alignItems: "center" }}>
+                                  <ShieldCheck size={12} color="#10B981" /> A tiempo
+                                </span>
+                              )}
+                            </td>
+                          </>
+                        )}
+
+                        <td style={{ padding: "12px 8px", textAlign: "right" }}>
+                          <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", alignItems: "center" }}>
+                            {activeTab === "activas" && (
+                              <>
+                                {therapist?.telefono ? (
+                                  <button
+                                    className="btn"
+                                    style={{ padding: "4px 8px", fontSize: "0.8rem", backgroundColor: "#E0F2FE", color: "#0369A1", border: "1px solid #BAE6FD" }}
+                                    onClick={async () => {
+                                      const msg = `Hola ${therapist.nombre}, te saluda MERAKI. Tienes asignada la evaluación de ${ev.nombrePaciente} (${ev.tipo}). Recuerda que el informe escrito debe ser entregado en recepción a los 5 días de haber concluido la evaluación. La fecha límite acordada es el ${ev.fechaAcordadaRecep || "N/A"}. ¡Muchas gracias!`;
+                                      const url = `https://api.whatsapp.com/send?phone=${therapist.telefono.replace(/[^0-9]/g, "").replace(/^0/, "593")}&text=${encodeURIComponent(msg)}`;
+                                      window.open(url, "_blank");
+                                      await registrarLog(
+                                        currentUser,
+                                        "Evaluaciones (Alerta WA)",
+                                        `Envió alerta de informe por WhatsApp al terapeuta ${therapist.nombre} para el paciente ${ev.nombrePaciente}`
+                                      );
+                                    }}
+                                    title="Enviar recordatorio de plazo por WhatsApp"
+                                  >
+                                    <MessageCircle size={14} /> Recordar
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="btn"
+                                    style={{ padding: "4px 8px", fontSize: "0.8rem", backgroundColor: "#F3F4F6", color: "var(--text-muted)", border: "1px solid var(--border-light)", cursor: "not-allowed" }}
+                                    disabled
+                                    title="Configure el celular del terapeuta en Ajustes para enviar alerta"
+                                  >
+                                    <MessageCircle size={14} /> Recordar
+                                  </button>
+                                )}
+                              </>
+                            )}
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ padding: "4px 8px", fontSize: "0.8rem" }}
+                              onClick={() => handleOpenEditModal(ev)}
+                            >
+                              <Edit size={14} /> Editar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredEvaluations.length === 0 && (
+                    <tr>
+                      <td colSpan={activeTab === "activas" ? 9 : 9} style={{ padding: "30px", textAlign: "center", color: "var(--text-muted)" }}>
+                        No se encontraron evaluaciones.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
+
+        {/* COLUMNA DERECHA: SIDEBAR DE ALERTAS DE ATRASO (Solo visible en Evaluaciones Activas) */}
+        {activeTab === "activas" && (
+          <div style={{ 
+            flex: "1 1 300px", 
+            minWidth: 0,
+            position: "sticky",
+            top: "20px"
+          }}>
+            <div className="glass" style={{ 
+              padding: "20px", 
+              borderRadius: "var(--radius-md)", 
+              boxShadow: "var(--shadow-sm)",
+              borderLeft: "5px solid #EF4444",
+              backgroundColor: "rgba(255, 255, 255, 0.95)"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <h3 style={{ color: "#991B1B", fontWeight: 600, fontSize: "1.05rem", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                  <AlertTriangle size={18} color="#EF4444" />
+                  Fuera de Plazo
+                </h3>
+                <span style={{ 
+                  fontSize: "0.75rem", 
+                  fontWeight: 700, 
+                  color: "white", 
+                  backgroundColor: "#EF4444", 
+                  padding: "2px 8px", 
+                  borderRadius: "10px" 
+                }}>
+                  {activeOverdueEvaluations.length}
+                </span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "500px", overflowY: "auto", paddingRight: "4px" }}>
+                {activeOverdueEvaluations.map(ev => {
+                  const days = getElapsedDays(ev);
+                  const therapist = terapeutas.find(t => t.id === ev.terapeutaId);
+                  const isOverdueAcordada = (ev.estado === "en_sesion" || ev.estado === "redaccion") && ev.fechaAcordadaRecep && ev.fechaAcordadaRecep < todayStr;
+                  const isOverdueFin = ev.estado === "redaccion" && days > 5;
+                  
+                  let delayMsg = "";
+                  if (isOverdueAcordada && isOverdueFin) {
+                    delayMsg = `Venció (${ev.fechaAcordadaRecep}) y lleva ${days} días desde fin.`;
+                  } else if (isOverdueAcordada) {
+                    delayMsg = `Superó fecha límite (${ev.fechaAcordadaRecep}).`;
+                  } else if (isOverdueFin) {
+                    delayMsg = `Lleva ${days} días desde fin (Límite: 5d).`;
+                  }
+
+                  return (
+                    <div key={ev.id} style={{
+                      backgroundColor: "#FFF5F5",
+                      border: "1px solid #FCA5A5",
+                      borderRadius: "var(--radius-sm)",
+                      padding: "12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <span style={{ fontWeight: 600, color: "#111827", fontSize: "0.85rem" }}>{ev.nombrePaciente}</span>
+                        <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#B91C1C", backgroundColor: "#FEE2E2", padding: "1px 5px", borderRadius: "4px" }}>
+                          {ev.id}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                        {ev.tipo} • <strong>{therapist?.nombre || "Terapeuta"}</strong>
+                      </div>
+                      <div style={{ fontSize: "0.75rem", color: "#B91C1C", display: "flex", alignItems: "center", gap: "4px", fontWeight: 500 }}>
+                        <Clock size={12} /> {delayMsg}
+                      </div>
+
+                      <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", marginTop: "4px" }}>
+                        {therapist?.telefono ? (
+                          <button
+                            className="btn"
+                            style={{
+                              padding: "4px 8px",
+                              fontSize: "0.75rem",
+                              backgroundColor: "#FEE2E2",
+                              color: "#991B1B",
+                              border: "1px solid #FCA5A5",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                            onClick={async () => {
+                              const msg = `Hola ${therapist.nombre}, te saluda MERAKI. Te recordamos amablemente que la evaluación de ${ev.nombrePaciente} (${ev.tipo}) se encuentra fuera de plazo. La fecha acordada de recepción era el ${ev.fechaAcordadaRecep || "N/A"}. Por favor, ingresa el informe hoy para poder coordinar la entrega. ¡Muchas gracias!`;
+                              const url = `https://api.whatsapp.com/send?phone=${therapist.telefono.replace(/[^0-9]/g, "").replace(/^0/, "593")}&text=${encodeURIComponent(msg)}`;
+                              window.open(url, "_blank");
+                              await registrarLog(
+                                currentUser,
+                                "Evaluaciones (Alerta WA)",
+                                `Envió alerta de informe por WhatsApp al terapeuta ${therapist.nombre} para el paciente ${ev.nombrePaciente}`
+                              );
+                            }}
+                          >
+                            <MessageCircle size={12} /> Alerta
+                          </button>
+                        ) : (
+                          <button
+                            className="btn"
+                            style={{ padding: "4px 8px", fontSize: "0.75rem", backgroundColor: "#F3F4F6", color: "var(--text-muted)", border: "1px solid var(--border-light)", cursor: "not-allowed" }}
+                            disabled
+                          >
+                            <MessageCircle size={12} /> Alerta
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: "4px 8px", fontSize: "0.75rem" }}
+                          onClick={() => handleOpenEditModal(ev)}
+                        >
+                          <Edit size={12} /> Editar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {activeOverdueEvaluations.length === 0 && (
+                  <div style={{ 
+                    textAlign: "center", 
+                    padding: "20px 10px", 
+                    color: "#065F46",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "10px"
+                  }}>
+                    <ShieldCheck size={36} color="#10B981" />
+                    <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
+                      ¡Todo al día! Sin evaluaciones retrasadas.
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add Modal */}
@@ -358,7 +742,10 @@ export default function EvaluacionesApp() {
                 <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Paciente*</label>
                 <select required className="input-field" value={newEv.pacienteId} onChange={(e) => setNewEv({...newEv, pacienteId: e.target.value})}>
                   <option value="">Seleccione Paciente...</option>
-                  {pacientes.filter(p => p.estado === "activo").map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  {pacientes
+                    .filter(p => p.estado === "activo")
+                    .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es", { sensitivity: "base" }))
+                    .map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                 </select>
               </div>
 
@@ -376,7 +763,9 @@ export default function EvaluacionesApp() {
                 <label style={{ fontSize: "0.8rem", fontWeight: 500 }}>Terapeuta Evaluador*</label>
                 <select required className="input-field" value={newEv.terapeutaId} onChange={(e) => setNewEv({...newEv, terapeutaId: e.target.value})}>
                   <option value="">Seleccione Terapeuta...</option>
-                  {terapeutas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                  {terapeutas
+                    .filter(t => !t.nombre.includes("Recepción") && !t.nombre.includes("Recepcion") && !t.nombre.includes("Josua") && !t.nombre.includes("Joshua"))
+                    .map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                 </select>
               </div>
 

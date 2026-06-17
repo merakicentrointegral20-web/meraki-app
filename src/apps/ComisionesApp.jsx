@@ -179,7 +179,7 @@ export default function ComisionesApp() {
 
   return (
     <div className="fade-in" style={{ padding: "20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+      <div className="responsive-flex" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
         <div>
           <h2 style={{ color: "var(--purple-dark)", fontWeight: 600 }}>Cálculo de Comisiones</h2>
           <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Calcula los ingresos de los profesionales que cobran por porcentaje de terapias atendidas.</p>
@@ -199,7 +199,7 @@ export default function ComisionesApp() {
                 <select className="input-field" value={selectedTerId} onChange={(e) => setSelectedTerId(e.target.value)}>
                   <option value="">Seleccione profesional...</option>
                   {terapeutas
-                    .filter(t => isAdmin || t.comisionActiva)
+                    .filter(t => (isAdmin || t.comisionActiva) && !t.nombre.includes("Recepción") && !t.nombre.includes("Recepcion") && !t.nombre.includes("Josua") && !t.nombre.includes("Joshua"))
                     .map(t => (
                       <option key={t.id} value={t.id}>
                         {t.nombre} {t.comisionActiva ? `(${t.comisionPorcentaje}%)` : "(Salario Fijo)"}

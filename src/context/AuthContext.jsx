@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
   // --- MOCK USERS ---
   const mockUsers = [
     { email: "jeni@gmail.com", uid: "uid_admin", nombre: "Administradora Meraki (Jeni)", rol: "administrador" },
-    { email: "joshua@gmail.com", uid: "uid_joshua", nombre: "Joshua (Recepción)", rol: "recepcionista" },
+    { email: "joshua@gmail.com", uid: "uid_joshua", nombre: "Josua (Recepción)", rol: "recepcionista" },
     { email: "toño@gmail.com", uid: "uid_tono", nombre: "Toño (Recursos Humanos)", rol: "administrador" }
   ];
 
@@ -32,19 +32,22 @@ export const AuthProvider = ({ children }) => {
           try {
             const userDocSnap = await getDoc(doc(db, "usuarios", user.uid));
             const dbUser = userDocSnap.exists() ? userDocSnap.data() : null;
+            const emailClean = user.email ? user.email.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+            const isAdminEmail = emailClean === "jeni@gmail.com" || emailClean === "tono@gmail.com";
+
             if (dbUser) {
               setCurrentUser({
                 uid: user.uid,
                 email: user.email,
                 nombre: dbUser.nombre || user.email,
-                rol: dbUser.rol || "recepcionista"
+                rol: dbUser.rol || (isAdminEmail ? "administrador" : "recepcionista")
               });
             } else {
               // Create user in DB if doesn't exist
               const newUserData = {
                 id: user.uid,
                 nombre: user.email.split("@")[0],
-                rol: "recepcionista",
+                rol: isAdminEmail ? "administrador" : "recepcionista",
                 correo: user.email
               };
               await setDocument("usuarios", user.uid, newUserData);
@@ -57,11 +60,13 @@ export const AuthProvider = ({ children }) => {
             }
           } catch (e) {
             console.error("Error fetching db user info:", e);
+            const emailClean = user.email ? user.email.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+            const isAdminEmail = emailClean === "jeni@gmail.com" || emailClean === "tono@gmail.com";
             setCurrentUser({
               uid: user.uid,
               email: user.email,
               nombre: user.email.split("@")[0],
-              rol: "recepcionista"
+              rol: isAdminEmail ? "administrador" : "recepcionista"
             });
           }
         } else {
@@ -89,10 +94,12 @@ export const AuthProvider = ({ children }) => {
         setTimeout(() => {
           let validated = false;
           const user = mockUsers.find(u => {
-            if (u.email !== email) return false;
-            if (email.includes("jeni")) return password === "jeni2026";
-            if (email.includes("joshua")) return password === "joshua2026";
-            if (email.includes("toño") || email.includes("tono")) return password === "toño2026" || password === "tono2026";
+            const emailCleanInput = email ? email.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+            const emailCleanMock = u.email ? u.email.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+            if (emailCleanMock !== emailCleanInput) return false;
+            if (emailCleanInput.includes("jeni")) return password === "jeni2026";
+            if (emailCleanInput.includes("joshua")) return password === "joshua2026";
+            if (emailCleanInput.includes("tono")) return password === "toño2026" || password === "tono2026";
             return false;
           });
           if (user) {

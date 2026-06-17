@@ -43,9 +43,9 @@ const getMockCollection = (collectionName) => {
       const parsed = JSON.parse(data);
       const hasThomas = parsed.some(t => t.nombre.includes("Thomas"));
       const hasJeniComision = parsed.some(t => t.nombre.includes("Jeniffer") && t.comisionActiva);
-      const hasJoshua = parsed.some(t => t.nombre.includes("Joshua"));
+      const hasJoshua = parsed.some(t => t.nombre.includes("Joshua") || t.nombre.includes("Josua"));
       if (hasThomas || hasJeniComision || !hasJoshua) {
-        console.log("Migrating therapist database to match new settings (Jeni fixed, Juan commission, Patricia fixed, Joshua added, Thomas deleted)...");
+        console.log("Migrating therapist database to match new settings (Jeni fixed, Juan commission, Patricia fixed, Josua added, Thomas deleted)...");
         const defaultData = defaultMockData["terapeutas"] || [];
         localStorage.setItem(`meraki_terapeutas`, JSON.stringify(defaultData));
         return defaultData;
@@ -225,3 +225,19 @@ const subscribeToCollectionMock = (collectionName, callback) => {
     listeners[collectionName] = listeners[collectionName].filter(cb => cb !== callback);
   };
 };
+
+export const registrarLog = async (usuario, accion, detalles) => {
+  try {
+    const logData = {
+      usuarioEmail: usuario?.email || "sistema@meraki.com",
+      usuarioNombre: usuario?.nombre || "Sistema",
+      accion,
+      detalles,
+      fecha: new Date().toISOString()
+    };
+    await addDocument("auditoria", logData);
+  } catch (err) {
+    console.error("Error al registrar log de auditoría:", err);
+  }
+};
+

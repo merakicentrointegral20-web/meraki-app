@@ -1,9 +1,33 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { subscribeToCollection, addDocument, updateDocument, getCollection } from "../db";
-import { User, Phone, MapPin, FileText, Plus, Search, ShieldAlert, X, ChevronRight, Edit2 } from "lucide-react";
+import { subscribeToCollection, addDocument, updateDocument, getCollection, registrarLog } from "../db";
+import { useAuth } from "../context/AuthContext";
+import { User, Phone, MapPin, FileText, Plus, Search, ShieldAlert, X, ChevronRight, Edit2, Calendar, Trash2 } from "lucide-react";
+
+const cleanAndFormatIdentificacion = (val) => {
+  if (!val) return "";
+  let clean = String(val).trim().split('.')[0];
+  if (/^\d+$/.test(clean)) {
+    if (clean.length === 9) {
+      return "0" + clean;
+    }
+    if (clean.length === 12) {
+      return "0" + clean;
+    }
+  }
+  return clean;
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return "Sin fecha";
+  const part = dateStr.split(" ")[0].split("T")[0];
+  const parts = part.split("-");
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return dateStr;
+};
 
 export default function PacientesApp() {
+  const { currentUser } = useAuth();
   const [pacientes, setPacientes] = useState([]);
   const [terapeutas, setTerapeutas] = useState([]);
   const [listaNegra, setListaNegra] = useState([]);
@@ -31,6 +55,9 @@ export default function PacientesApp() {
     estado: "inactivo", motivoSalida: "", fechaSalida: new Date().toISOString().split('T')[0]
   });
   const [newDiagText, setNewDiagText] = useState("");
+  const [newDiagDate, setNewDiagDate] = useState(new Date().toISOString().split('T')[0]);
+  const [editingDiagIdx, setEditingDiagIdx] = useState(null);
+  const [editDiagForm, setEditDiagForm] = useState({ fecha: "", diagnostico: "" });
 
   useEffect(() => {
     const unsubPacientes = subscribeToCollection("pacientes", setPacientes);
@@ -62,8 +89,9 @@ export default function PacientesApp() {
       alert("Cédula y Nombre son obligatorios");
       return;
     }
+    const cleanId = cleanAndFormatIdentificacion(newPaciente.id);
     // Check duplicates
-    if (pacientes.some(p => p.id === newPaciente.id)) {
+    if (pacientes.some(p => cleanAndFormatIdentificacion(p.id) === cleanId)) {
       alert("Error: Ya existe un paciente registrado con esta Cédula.");
       return;
     }
@@ -71,10 +99,21 @@ export default function PacientesApp() {
     try {
       const dataToSave = {
         ...newPaciente,
+        id: cleanId,
+        cedulaRepresentante: cleanAndFormatIdentificacion(newPaciente.cedulaRepresentante),
+        datosFacturacion: {
+          ...newPaciente.datosFacturacion,
+          ruc: cleanAndFormatIdentificacion(newPaciente.datosFacturacion.ruc)
+        },
         estado: "activo",
-        diagnosticos: newDiagText ? [{ fecha: new Date().toISOString().split('T')[0], diagnostico: newDiagText, usuario: "Recepción" }] : []
+        diagnosticos: newDiagText ? [{ fecha: newDiagDate || new Date().toISOString().split('T')[0], diagnostico: newDiagText, usuario: "Recepción" }] : []
       };
       await addDocument("pacientes", dataToSave);
+      await registrarLog(
+        currentUser,
+        "Pacientes (Registro)",
+        `Registró al paciente ${dataToSave.nombre} (Cédula: ${dataToSave.id})`
+      );
       setShowAddForm(false);
       setNewPaciente({
         id: "", nombre: "", fechaNacimiento: "", representante: "", cedulaRepresentante: "",
@@ -83,6 +122,7 @@ export default function PacientesApp() {
         datosFacturacion: { ruc: "", nombre: "", correo: "", direccion: "", telefono: "" }
       });
       setNewDiagText("");
+      setNewDiagDate(new Date().toISOString().split('T')[0]);
       alert("Paciente registrado con éxito.");
     } catch (e) {
       console.error(e);
@@ -92,18 +132,18 @@ export default function PacientesApp() {
 
   const handleOpenEditModal = (paciente) => {
     setEditPaciente({
-      id: paciente.id,
+      id: cleanAndFormatIdentificacion(paciente.id),
       nombre: paciente.nombre || "",
       fechaNacimiento: paciente.fechaNacimiento || "",
       representante: paciente.representante || "",
-      cedulaRepresentante: paciente.cedulaRepresentante || "",
+      cedulaRepresentante: cleanAndFormatIdentificacion(paciente.cedulaRepresentante),
       telefono: paciente.telefono || "",
       telefonoEmergencia: paciente.telefonoEmergencia || "",
       ciudad: paciente.ciudad || "",
       terapeutaAsignadoId: paciente.terapeutaAsignadoId || "",
       requiereFactura: paciente.requiereFactura || false,
       datosFacturacion: {
-        ruc: paciente.datosFacturacion?.ruc || "",
+        ruc: cleanAndFormatIdentificacion(paciente.datosFacturacion?.ruc),
         nombre: paciente.datosFacturacion?.nombre || "",
         correo: paciente.datosFacturacion?.correo || "",
         direccion: paciente.datosFacturacion?.direccion || "",
@@ -124,16 +164,27 @@ export default function PacientesApp() {
         nombre: editPaciente.nombre,
         fechaNacimiento: editPaciente.fechaNacimiento,
         representante: editPaciente.representante,
-        cedulaRepresentante: editPaciente.cedulaRepresentante,
+        cedulaRepresentante: cleanAndFormatIdentificacion(editPaciente.cedulaRepresentante),
         telefono: editPaciente.telefono,
         telefonoEmergencia: editPaciente.telefonoEmergencia,
         ciudad: editPaciente.ciudad,
         terapeutaAsignadoId: editPaciente.terapeutaAsignadoId,
         requiereFactura: editPaciente.requiereFactura,
-        datosFacturacion: editPaciente.requiereFactura ? editPaciente.datosFacturacion : { ruc: "", nombre: "", correo: "", direccion: "", telefono: "" }
+        datosFacturacion: editPaciente.requiereFactura ? {
+          ruc: cleanAndFormatIdentificacion(editPaciente.datosFacturacion.ruc),
+          nombre: editPaciente.datosFacturacion.nombre,
+          correo: editPaciente.datosFacturacion.correo,
+          direccion: editPaciente.datosFacturacion.direccion,
+          telefono: editPaciente.datosFacturacion.telefono
+        } : { ruc: "", nombre: "", correo: "", direccion: "", telefono: "" }
       };
 
       await updateDocument("pacientes", editPaciente.id, updatedFields);
+      await registrarLog(
+        currentUser,
+        "Pacientes (Modificación)",
+        `Modificó los datos del paciente ${editPaciente.nombre} (Cédula: ${editPaciente.id})`
+      );
       
       // Update selected patient local state if it's the one currently open
       if (selectedPaciente?.id === editPaciente.id) {
@@ -162,6 +213,11 @@ export default function PacientesApp() {
         motivoSalida: deactivateInfo.motivoSalida,
         fechaSalida: deactivateInfo.fechaSalida
       });
+      await registrarLog(
+        currentUser,
+        "Pacientes (Cambio Estado)",
+        `Cambió estado del paciente ${selectedPaciente.nombre} a "${deactivateInfo.estado}". Motivo: ${deactivateInfo.motivoSalida}`
+      );
       
       // Auto cancel future appointments for this patient
       const appointments = await getCollection("citas");
@@ -181,17 +237,78 @@ export default function PacientesApp() {
 
   const handleAddDiagnosis = async () => {
     if (!newDiagText.trim()) return;
+    const dateToUse = newDiagDate || new Date().toISOString().split('T')[0];
     const updatedDiag = [
       ...(selectedPaciente.diagnosticos || []),
-      { fecha: new Date().toISOString().split('T')[0], diagnostico: newDiagText, usuario: "Administrador" }
+      { fecha: dateToUse, diagnostico: newDiagText.trim(), usuario: currentUser?.rol === "administrador" ? "Administrador" : "Recepción" }
     ];
     try {
       await updateDocument("pacientes", selectedPaciente.id, { diagnosticos: updatedDiag });
+      await registrarLog(
+        currentUser,
+        "Pacientes (Diagnóstico)",
+        `Agregó diagnóstico a ${selectedPaciente.nombre}: "${newDiagText.trim()}" con fecha ${dateToUse}`
+      );
       setSelectedPaciente({ ...selectedPaciente, diagnosticos: updatedDiag });
       setNewDiagText("");
+      setNewDiagDate(new Date().toISOString().split('T')[0]);
       alert("Diagnóstico actualizado.");
     } catch (e) {
       console.error(e);
+      alert("Error al actualizar diagnóstico.");
+    }
+  };
+
+  const handleStartEditDiag = (idx, diag) => {
+    setEditingDiagIdx(idx);
+    setEditDiagForm({
+      fecha: diag.fecha ? diag.fecha.split(" ")[0].split("T")[0] : "",
+      diagnostico: diag.diagnostico || ""
+    });
+  };
+
+  const handleSaveDiagEdit = async (idx) => {
+    if (!editDiagForm.diagnostico.trim()) return;
+    const updatedDiag = [...(selectedPaciente.diagnosticos || [])];
+    const oldDiag = updatedDiag[idx];
+    updatedDiag[idx] = {
+      ...oldDiag,
+      fecha: editDiagForm.fecha || oldDiag.fecha,
+      diagnostico: editDiagForm.diagnostico.trim()
+    };
+    try {
+      await updateDocument("pacientes", selectedPaciente.id, { diagnosticos: updatedDiag });
+      await registrarLog(
+        currentUser,
+        "Pacientes (Diagnóstico Modificado)",
+        `Modificó diagnóstico en historial de ${selectedPaciente.nombre}: "${editDiagForm.diagnostico.trim()}"`
+      );
+      setSelectedPaciente({ ...selectedPaciente, diagnosticos: updatedDiag });
+      setEditingDiagIdx(null);
+      alert("Diagnóstico modificado.");
+    } catch (e) {
+      console.error(e);
+      alert("Error al guardar cambios.");
+    }
+  };
+
+  const handleDeleteDiag = async (idx) => {
+    if (confirm("¿Está seguro de eliminar esta entrada del historial diagnóstico?")) {
+      const updatedDiag = [...(selectedPaciente.diagnosticos || [])];
+      const deleted = updatedDiag.splice(idx, 1)[0];
+      try {
+        await updateDocument("pacientes", selectedPaciente.id, { diagnosticos: updatedDiag });
+        await registrarLog(
+          currentUser,
+          "Pacientes (Diagnóstico Eliminado)",
+          `Eliminó diagnóstico de ${selectedPaciente.nombre}: "${deleted.diagnostico}"`
+        );
+        setSelectedPaciente({ ...selectedPaciente, diagnosticos: updatedDiag });
+        alert("Diagnóstico eliminado.");
+      } catch (e) {
+        console.error(e);
+        alert("Error al eliminar.");
+      }
     }
   };
 
@@ -202,21 +319,23 @@ export default function PacientesApp() {
     );
   };
 
-  const filteredPacientes = pacientes.filter(p => {
-    const matchesSearch = 
-      p.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.representante?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.id?.includes(searchTerm);
-      
-    const matchesEstado = 
-      filterEstado === "todos" ? true : p.estado === filterEstado;
+  const filteredPacientes = pacientes
+    .filter(p => {
+      const matchesSearch = 
+        p.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.representante?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.id?.includes(searchTerm);
+        
+      const matchesEstado = 
+        filterEstado === "todos" ? true : p.estado === filterEstado;
 
-    return matchesSearch && matchesEstado;
-  });
+      return matchesSearch && matchesEstado;
+    })
+    .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es", { sensitivity: "base" }));
 
   return (
-    <div className="fade-in" style={{ padding: "20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+    <div className="fade-in pacientes-app" style={{ padding: "20px" }}>
+      <div className="responsive-flex" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
         <div>
           <h2 style={{ color: "var(--purple-dark)", fontWeight: 600 }}>Directorio de Pacientes</h2>
           <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Administra las fichas de los niños y representantes.</p>
@@ -289,7 +408,7 @@ export default function PacientesApp() {
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: "14px 8px", color: "var(--text-muted)" }}>{p.id}</td>
+                      <td style={{ padding: "14px 8px", color: "var(--text-muted)" }}>{cleanAndFormatIdentificacion(p.id)}</td>
                       <td style={{ padding: "14px 8px", color: "var(--text-main)" }}>{calculateAge(p.fechaNacimiento)}</td>
                       <td style={{ padding: "14px 8px", color: "var(--text-muted)" }}>{p.representante}</td>
                       <td style={{ padding: "14px 8px" }}>
@@ -324,7 +443,7 @@ export default function PacientesApp() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <h3 style={{ color: "var(--text-main)", fontWeight: 600 }}>{selectedPaciente.nombre}</h3>
-                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>C.I: {selectedPaciente.id}</span>
+                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>C.I: {cleanAndFormatIdentificacion(selectedPaciente.id)}</span>
               </div>
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <button 
@@ -348,7 +467,8 @@ export default function PacientesApp() {
             )}
 
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "0.9rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><User size={16} color="var(--text-muted)" /> <strong>Representante:</strong> {selectedPaciente.representante} (C.I: {selectedPaciente.cedulaRepresentante})</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><User size={16} color="var(--text-muted)" /> <strong>Representante:</strong> {selectedPaciente.representante} (C.I: {cleanAndFormatIdentificacion(selectedPaciente.cedulaRepresentante)})</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><Calendar size={16} color="var(--text-muted)" /> <strong>Fecha de Nacimiento:</strong> {formatDate(selectedPaciente.fechaNacimiento)} ({calculateAge(selectedPaciente.fechaNacimiento)})</div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><Phone size={16} color="var(--text-muted)" /> <strong>Teléfonos:</strong> {selectedPaciente.telefono} | Emergencias: {selectedPaciente.telefonoEmergencia}</div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><MapPin size={16} color="var(--text-muted)" /> <strong>Ciudad:</strong> {selectedPaciente.ciudad}</div>
             </div>
@@ -357,26 +477,94 @@ export default function PacientesApp() {
 
             <div>
               <h4 style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--purple-dark)", marginBottom: "8px" }}>Historial Diagnóstico</h4>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "150px", overflowY: "auto", padding: "4px" }}>
-                {selectedPaciente.diagnosticos?.map((d, i) => (
-                  <div key={i} style={{ backgroundColor: "var(--bg-secondary)", padding: "8px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-soft)", fontSize: "0.85rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-muted)", fontSize: "0.75rem", marginBottom: "4px" }}>
-                      <span>{d.fecha}</span>
-                      <span>Por: {d.usuario}</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "200px", overflowY: "auto", padding: "4px" }}>
+                {selectedPaciente.diagnosticos?.map((d, i) => {
+                  const isEditing = editingDiagIdx === i;
+                  return (
+                    <div key={i} style={{ backgroundColor: "var(--bg-secondary)", padding: "8px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-soft)", fontSize: "0.85rem" }}>
+                      {isEditing ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <input 
+                            type="date" 
+                            className="input-field" 
+                            style={{ padding: "4px 8px", fontSize: "0.8rem", margin: 0 }} 
+                            value={editDiagForm.fecha} 
+                            onChange={(e) => setEditDiagForm({...editDiagForm, fecha: e.target.value})} 
+                          />
+                          <textarea 
+                            rows="2" 
+                            className="input-field" 
+                            style={{ padding: "4px 8px", fontSize: "0.8rem", resize: "none", margin: 0 }} 
+                            value={editDiagForm.diagnostico} 
+                            onChange={(e) => setEditDiagForm({...editDiagForm, diagnostico: e.target.value})} 
+                          />
+                          <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                            <button 
+                              type="button"
+                              className="btn btn-secondary" 
+                              style={{ padding: "2px 6px", fontSize: "0.75rem" }} 
+                              onClick={() => setEditingDiagIdx(null)}
+                            >
+                              Cancelar
+                            </button>
+                            <button 
+                              type="button"
+                              className="btn btn-primary" 
+                              style={{ padding: "2px 6px", fontSize: "0.75rem" }} 
+                              onClick={() => handleSaveDiagEdit(i)}
+                            >
+                              Guardar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-muted)", fontSize: "0.75rem", marginBottom: "4px" }}>
+                            <span>{formatDate(d.fecha)}</span>
+                            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                              <span>Por: {d.usuario}</span>
+                              <button 
+                                type="button"
+                                onClick={() => handleStartEditDiag(i, d)} 
+                                style={{ border: "none", background: "none", cursor: "pointer", padding: "2px", color: "var(--text-muted)" }}
+                                title="Editar"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => handleDeleteDiag(i)} 
+                                style={{ border: "none", background: "none", cursor: "pointer", padding: "2px", color: "#EF4444" }}
+                                title="Eliminar"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                          <div style={{ wordBreak: "break-word" }}>{d.diagnostico}</div>
+                        </>
+                      )}
                     </div>
-                    <div>{d.diagnostico}</div>
-                  </div>
-                ))}
+                  );
+                })}
                 {(!selectedPaciente.diagnosticos || selectedPaciente.diagnosticos.length === 0) && (
                   <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Sin diagnósticos registrados.</span>
                 )}
               </div>
 
-              <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+              <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+                <input 
+                  type="date"
+                  className="input-field"
+                  style={{ width: "140px", margin: 0 }}
+                  value={newDiagDate}
+                  onChange={(e) => setNewDiagDate(e.target.value)}
+                />
                 <input 
                   type="text" 
                   placeholder="Actualizar diagnóstico..." 
                   className="input-field" 
+                  style={{ flex: 1, margin: 0 }}
                   value={newDiagText} 
                   onChange={(e) => setNewDiagText(e.target.value)} 
                 />
@@ -390,7 +578,7 @@ export default function PacientesApp() {
               <h4 style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "8px" }}>Perfil de Facturación</h4>
               <div style={{ fontSize: "0.85rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                 <div><strong>¿Desea Factura?:</strong> {selectedPaciente.requiereFactura ? "Sí" : "No"}</div>
-                <div><strong>RUC/C.I:</strong> {selectedPaciente.datosFacturacion?.ruc || "Sin datos"}</div>
+                <div><strong>RUC/C.I:</strong> {cleanAndFormatIdentificacion(selectedPaciente.datosFacturacion?.ruc) || "Sin datos"}</div>
                 <div style={{ gridColumn: "span 2" }}><strong>Nombre Factura:</strong> {selectedPaciente.datosFacturacion?.nombre || "Sin datos"}</div>
                 <div style={{ gridColumn: "span 2" }}><strong>Dirección:</strong> {selectedPaciente.datosFacturacion?.direccion || "Sin datos"}</div>
                 <div style={{ gridColumn: "span 2" }}><strong>Correo:</strong> {selectedPaciente.datosFacturacion?.correo || "Sin datos"}</div>
@@ -413,6 +601,11 @@ export default function PacientesApp() {
                   style={{ width: "100%", justifyContent: "center", marginTop: "8px", padding: "6px" }}
                   onClick={async () => {
                     await updateDocument("pacientes", selectedPaciente.id, { estado: "activo", motivoSalida: "", fechaSalida: "" });
+                    await registrarLog(
+                      currentUser,
+                      "Pacientes (Cambio Estado)",
+                      `Reactivó al paciente ${selectedPaciente.nombre}`
+                    );
                     setSelectedPaciente({ ...selectedPaciente, estado: "activo", motivoSalida: "", fechaSalida: "" });
                     alert("Paciente reactivado.");
                   }}

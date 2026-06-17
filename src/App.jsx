@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { subscribeToCollection } from "./db";
+import { subscribeToCollection, getCollection, registrarLog } from "./db";
 import PacientesApp from "./apps/PacientesApp";
 import AgendaApp from "./apps/AgendaApp";
 import RecordatoriosApp from "./apps/RecordatoriosApp";
@@ -11,13 +11,14 @@ import ComisionesApp from "./apps/ComisionesApp";
 import AjustesApp from "./apps/AjustesApp";
 import FinanzasDashboardApp from "./apps/FinanzasDashboardApp";
 import NominaRrhhApp from "./apps/NominaRrhhApp";
+import AuditoriaApp from "./apps/AuditoriaApp";
 
 // Lucide Icons
 import { 
   Users, Calendar, MessageSquare, DollarSign, 
   FileText, CheckSquare, Calculator, Settings, 
   LogOut, Home, Lock, Bell, Sparkles, TrendingUp, AlertTriangle,
-  Briefcase, Shield
+  Briefcase, Shield, Database
 } from "lucide-react";
 
 import "./App.css";
@@ -148,7 +149,7 @@ function LoginScreen() {
                 }}>
                   <Users size={32} />
                 </div>
-                <span style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "1rem" }}>Joshua</span>
+                <span style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "1rem" }}>Josua</span>
                 <span style={{ color: "var(--pink-dark)", fontSize: "0.72rem", background: "var(--pink-pastel-soft)", padding: "2px 8px", borderRadius: "10px", fontWeight: 600 }}>Recepción</span>
               </div>
             </div>
@@ -168,7 +169,7 @@ function LoginScreen() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h4 style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "0.9rem" }}>
-                  {selectedUser === "admin" ? "Jeni (Administración)" : selectedUser === "tono" ? "Toño (Recursos Humanos)" : "Joshua (Recepción)"}
+                  {selectedUser === "admin" ? "Jeni (Administración)" : selectedUser === "tono" ? "Toño (Recursos Humanos)" : "Josua (Recepción)"}
                 </h4>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.78rem", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                   {email}
@@ -206,21 +207,281 @@ function LoginScreen() {
   );
 }
 
+// Componente de Panel de Alertas Críticas e Integridad Contable
+function AlertasCriticasPanel({ citas, evaluaciones, transacciones, auditorias, onNavigate }) {
+  const todayStr = new Date().toLocaleDateString("en-CA");
+  
+  // 1. Attended unpaid appointments
+  const countCitasSinCobrar = citas.filter(c => 
+    c.estadoAsistencia === "asistio" && c.cobrada !== true
+  ).length;
+
+  // 2. Unverified transfers
+  const countTransferenciasPendientes = transacciones.filter(t => 
+    t.tipo === "transferencia" && t.verificado !== true
+  ).length;
+
+  // 3. Omitted WhatsApp alerts
+  const countWasOmitidos = auditorias.filter(a => 
+    a.accion === "Agenda (Notificación WA)" && a.detalles?.includes("OMITIÓ/CANCELÓ")
+  ).length;
+
+  // 4. Overdue reports
+  const countInformesAtrasados = evaluaciones.filter(ev => 
+    (ev.estado === "en_sesion" || ev.estado === "redaccion") && 
+    ev.fechaAcordadaRecep && 
+    ev.fechaAcordadaRecep < todayStr
+  ).length;
+
+  // 5. Schedule conflicts (only active/pending and from today onwards)
+  const getChoquesCount = () => {
+    let conflicts = 0;
+    const grouped = {};
+    citas.forEach(c => {
+      if (!c.fecha || !c.horaInicio || !c.terapeutaId) return;
+      if (c.estadoAsistencia === "cancelado") return;
+      if (c.fecha < todayStr) return; // Only show conflicts for today and the future
+      const key = `${c.fecha}_${c.horaInicio}_${c.terapeutaId}`;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(c);
+    });
+    Object.values(grouped).forEach(list => {
+      if (list.length > 1) {
+        conflicts += (list.length - 1);
+      }
+    });
+    return conflicts;
+  };
+  const countChoques = getChoquesCount();
+
+  const totalAlerts = countCitasSinCobrar + countTransferenciasPendientes + countWasOmitidos + countInformesAtrasados + countChoques;
+
+  if (totalAlerts === 0) {
+    return (
+      <div className="alerts-panel" style={{ borderLeftColor: "#10B981", background: "rgba(240, 253, 250, 0.6)", borderImage: "none", borderColor: "rgba(16, 185, 129, 0.15)", width: "100%", maxWidth: "800px", margin: "0 auto 24px" }}>
+        <div className="alerts-panel-header" style={{ color: "#065F46" }}>
+          <Sparkles size={18} style={{ color: "#10B981" }} />
+          <span className="alerts-panel-title">Cabina de Control de Integridad</span>
+        </div>
+        <p style={{ fontSize: "0.82rem", color: "#065F46", fontWeight: 500 }}>
+          ✅ Todo en orden — No se registran discrepancias de cobro, retrasos en informes o choques de agenda hoy.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="alerts-panel" style={{ width: "100%", maxWidth: "800px", margin: "0 auto 24px" }}>
+      <div className="alerts-panel-header">
+        <AlertTriangle size={18} className="pulse-glow" style={{ color: "#EF4444" }} />
+        <span className="alerts-panel-title">Alertas Críticas y Discrepancias ({totalAlerts})</span>
+      </div>
+      
+      <div className="alerts-grid">
+        {countCitasSinCobrar > 0 && (
+          <div className="alert-card" onClick={() => onNavigate("caja")}>
+            <div className="alert-card-icon" style={{ backgroundColor: "#FEE2E2", color: "#EF4444" }}>
+              <DollarSign size={18} />
+            </div>
+            <div className="alert-card-content">
+              <div className="alert-card-count">{countCitasSinCobrar}</div>
+              <div className="alert-card-label">Citas asistidas sin cobrar</div>
+            </div>
+          </div>
+        )}
+
+        {countTransferenciasPendientes > 0 && (
+          <div className="alert-card" onClick={() => onNavigate("caja")}>
+            <div className="alert-card-icon" style={{ backgroundColor: "#FEF3C7", color: "#D97706" }}>
+              <DollarSign size={18} />
+            </div>
+            <div className="alert-card-content">
+              <div className="alert-card-count">{countTransferenciasPendientes}</div>
+              <div className="alert-card-label">Transferencias por conciliar</div>
+            </div>
+          </div>
+        )}
+
+        {countWasOmitidos > 0 && (
+          <div className="alert-card" onClick={() => onNavigate("auditoria")}>
+            <div className="alert-card-icon" style={{ backgroundColor: "#F3E8FF", color: "#9333EA" }}>
+              <MessageSquare size={18} />
+            </div>
+            <div className="alert-card-content">
+              <div className="alert-card-count">{countWasOmitidos}</div>
+              <div className="alert-card-label">Avisos WhatsApp omitidos</div>
+            </div>
+          </div>
+        )}
+
+        {countInformesAtrasados > 0 && (
+          <div className="alert-card" onClick={() => onNavigate("evaluaciones")}>
+            <div className="alert-card-icon" style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}>
+              <FileText size={18} />
+            </div>
+            <div className="alert-card-content">
+              <div className="alert-card-count">{countInformesAtrasados}</div>
+              <div className="alert-card-label">Informes atrasados</div>
+            </div>
+          </div>
+        )}
+
+        {countChoques > 0 && (
+          <div className="alert-card" onClick={() => onNavigate("agenda")}>
+            <div className="alert-card-icon" style={{ backgroundColor: "#FFF7ED", color: "#EA580C" }}>
+              <Calendar size={18} />
+            </div>
+            <div className="alert-card-content">
+              <div className="alert-card-count">{countChoques}</div>
+              <div className="alert-card-label">Choques en la agenda</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // 2. MAIN APP DASHBOARD & SWITCHER
 function MainDashboard() {
   const { currentUser, logout, isLocalDb } = useAuth();
   const [activeApp, setActiveApp] = useState("launchpad");
-  const [mainView, setMainView] = useState(currentUser?.email === "toño@gmail.com" ? "top" : "administracion");
+  
+  const emailClean = currentUser?.email ? currentUser.email.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+  const isTono = emailClean === "tono@gmail.com";
+  const isJeni = emailClean === "jeni@gmail.com";
+
+  const [mainView, setMainView] = useState(isTono ? "top" : "administracion");
   const [show4pmAlarm, setShow4pmAlarm] = useState(false);
+  const [alarmType, setAlarmType] = useState(null); // 'diario' | 'semanal' | 'ambos'
   const [citas, setCitas] = useState([]);
   const [evaluaciones, setEvaluaciones] = useState([]);
+  const [transacciones, setTransacciones] = useState([]);
+  const [auditorias, setAuditorias] = useState([]);
+  const [feriadosEventos, setFeriadosEventos] = useState([]);
+  const [silencedAlerts, setSilencedAlerts] = useState(() => {
+    try {
+      const saved = localStorage.getItem("meraki_silenced_alerts");
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("meraki_silenced_alerts", JSON.stringify(silencedAlerts));
+  }, [silencedAlerts]);
+
+  const [fridayBackupDismissed, setFridayBackupDismissed] = useState(() => {
+    try {
+      const todayStr = new Date().toISOString().split("T")[0];
+      return localStorage.getItem(`meraki_friday_backup_dismissed_${todayStr}`) === "true";
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const dismissFridayAlert = () => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    localStorage.setItem(`meraki_friday_backup_dismissed_${todayStr}`, "true");
+    setFridayBackupDismissed(true);
+  };
+
+  const [isExportingWeekly, setIsExportingWeekly] = useState(false);
+
+  const handleFridayBackup = async () => {
+    try {
+      setIsExportingWeekly(true);
+      const collections = [
+        "usuarios",
+        "terapeutas",
+        "servicios",
+        "pacientes",
+        "lista_negra",
+        "evaluaciones",
+        "citas",
+        "transacciones",
+        "tareas",
+        "feriados_eventos",
+        "auditoria",
+        "auditoria_agenda",
+        "empleados"
+      ];
+      
+      const collectionsData = {};
+      for (const colName of collections) {
+        try {
+          collectionsData[colName] = await getCollection(colName);
+        } catch (e) {
+          console.error(`Error al respaldar colección ${colName}:`, e);
+          collectionsData[colName] = [];
+        }
+      }
+      
+      const backup = {
+        metadata: {
+          version: "1.0",
+          fecha: new Date().toISOString(),
+          creadoPor: currentUser?.correo || "sistema",
+          registrosTotales: Object.values(collectionsData).reduce((sum, arr) => sum + arr.length, 0)
+        },
+        collections: collectionsData
+      };
+      
+      const jsonString = JSON.stringify(backup, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.href = url;
+      const dateStr = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
+      downloadAnchor.download = `meraki_respaldo_${dateStr}.json`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+      URL.revokeObjectURL(url);
+      
+      await registrarLog(
+        currentUser,
+        "Respaldo (Exportar)",
+        `Exportó un respaldo semanal de los viernes con ${backup.metadata.registrosTotales} registros.`
+      );
+      
+      alert("Respaldo semanal descargado con éxito.");
+      dismissFridayAlert();
+    } catch (err) {
+      console.error("Error al exportar respaldo:", err);
+      alert("Error al exportar respaldo: " + err.message);
+    } finally {
+      setIsExportingWeekly(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === "meraki_silenced_alerts") {
+        try {
+          setSilencedAlerts(e.newValue ? JSON.parse(e.newValue) : {});
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
 
   useEffect(() => {
     const unsub = subscribeToCollection("citas", setCitas);
     const unsubEv = subscribeToCollection("evaluaciones", setEvaluaciones);
+    const unsubTx = subscribeToCollection("transacciones", setTransacciones);
+    const unsubAud = subscribeToCollection("auditoria", setAuditorias);
+    const unsubFeriadosEventos = subscribeToCollection("feriados_eventos", setFeriadosEventos);
     return () => {
       unsub();
       unsubEv();
+      unsubTx();
+      unsubAud();
+      unsubFeriadosEventos();
     };
   }, []);
 
@@ -255,18 +516,82 @@ function MainDashboard() {
     }
   };
 
+  // HOLIDAY AND EVENT ALERTS ENGINE WITH WEEKEND SHIFTING & RECURRENCE
+  const getSystemAlerts = () => {
+    if (currentUser?.rol !== "recepcionista") return [];
+    const alerts = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    feriadosEventos.forEach(item => {
+      let eventDate = new Date(item.fecha + "T12:00:00");
+      eventDate.setHours(0, 0, 0, 0);
+
+      // Handle annual recurrence
+      if (item.repeticion === "anual") {
+        const currentYear = today.getFullYear();
+        let candidateDate = new Date(currentYear, eventDate.getMonth(), eventDate.getDate());
+        candidateDate.setHours(0, 0, 0, 0);
+        
+        const candidateEnd = new Date(candidateDate);
+        candidateEnd.setHours(23, 59, 59, 999);
+        if (candidateEnd < today) {
+          candidateDate = new Date(currentYear + 1, eventDate.getMonth(), eventDate.getDate());
+          candidateDate.setHours(0, 0, 0, 0);
+        }
+        eventDate = candidateDate;
+      }
+
+      // Calculate days ahead trigger
+      const daysAhead = item.tipo === "feriado" ? 8 : 7;
+      const alertDate = new Date(eventDate);
+      alertDate.setDate(eventDate.getDate() - daysAhead);
+
+      // Weekend shift
+      const alertDayOfWeek = alertDate.getDay();
+      if (alertDayOfWeek === 0) {
+        alertDate.setDate(alertDate.getDate() - 2);
+      } else if (alertDayOfWeek === 6) {
+        alertDate.setDate(alertDate.getDate() - 1);
+      }
+
+      if (today >= alertDate && today <= eventDate) {
+        const daysLeft = Math.floor((eventDate - today) / (1000 * 60 * 60 * 24));
+        const eventYear = eventDate.getFullYear();
+        const alertKey = `alert_${item.id}_${eventYear}`;
+
+        const formattedDate = eventDate.toLocaleDateString("es-ES", { day: 'numeric', month: 'long', year: 'numeric' });
+
+        alerts.push({
+          key: alertKey,
+          tipo: item.tipo,
+          titulo: item.titulo,
+          daysLeft,
+          fechaStr: formattedDate,
+          shiftedAlertDate: alertDate.toISOString().split('T')[0]
+        });
+      }
+    });
+
+    return alerts;
+  };
+
+  const systemAlerts = getSystemAlerts();
+  const activeHolidayAlert = systemAlerts.find(a => !silencedAlerts[a.key]);
+  const hasActiveHolidayAlarm = !!activeHolidayAlert;
+
   // Sound alarm effect
   useEffect(() => {
-    if (show4pmAlarm) {
+    if (show4pmAlarm || hasActiveHolidayAlarm) {
       playScandalousAlarm();
       const audioInterval = setInterval(() => {
         playScandalousAlarm();
       }, 1500);
       return () => clearInterval(audioInterval);
     }
-  }, [show4pmAlarm]);
+  }, [show4pmAlarm, hasActiveHolidayAlarm]);
 
-  // 3:00 PM Alarm logic check every 30 seconds
+  // 3:00 PM Alarm logic check every 30 seconds (Daily & Friday Weekly reminders)
   useEffect(() => {
     if (currentUser?.rol !== "recepcionista") return;
 
@@ -276,27 +601,39 @@ function MainDashboard() {
 
       // Check if it's 3 PM or later
       if (currentHour >= 15) {
-        // Find if we have appointments for tomorrow
+        let dailyPending = false;
+        let weeklyPending = false;
+
+        const getLocalDateStr = (d) => {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const r = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${r}`;
+        };
+
+        // 1. Check daily reminders for tomorrow
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        const tomorrowStr = getLocalDateStr(tomorrow);
         
-        const tomorrowCitas = citas.filter(c => c.fecha === tomorrowStr);
+        const tomorrowCitas = citas.filter(c => c.fecha === tomorrowStr && c.estadoAsistencia !== "falto_justificado");
+        const saved = localStorage.getItem("meraki_sent_recordatorios");
+        const sentState = saved ? JSON.parse(saved) : {};
+
         if (tomorrowCitas.length > 0) {
-          // Check if reminders were sent (mock check using localstorage state)
-          const saved = localStorage.getItem("meraki_sent_recordatorios");
-          const sentState = saved ? JSON.parse(saved) : {};
           const sentForTomorrow = sentState[tomorrowStr] || {};
-          
           const pendingCount = tomorrowCitas.filter(c => !sentForTomorrow[c.pacienteId]).length;
-          
           if (pendingCount > 0) {
-            setShow4pmAlarm(true);
-            return;
+            dailyPending = true;
           }
+        }        if (dailyPending) {
+          setAlarmType("diario");
+          setShow4pmAlarm(true);
+          return;
         }
       }
       setShow4pmAlarm(false);
+      setAlarmType(null);
     };
 
     checkAlarm();
@@ -323,15 +660,27 @@ function MainDashboard() {
     { id: "caja", title: "Caja y Finanzas", desc: "Cobros diarios y conciliación", icon: <DollarSign size={28} />, bg: "var(--pink-pastel-soft)", color: "var(--pink-dark)", roles: ["administrador", "recepcionista"] },
     { id: "evaluaciones", title: "Evaluaciones", desc: "Control de informes", icon: <FileText size={28} />, bg: "var(--purple-pastel-soft)", color: "var(--purple-dark)", roles: ["administrador", "recepcionista"] },
     { id: "tareas", title: "Tareas y Calendario", desc: "Checklist y feriados", icon: <CheckSquare size={28} />, bg: "var(--pink-pastel-soft)", color: "var(--pink-dark)", roles: ["administrador", "recepcionista"] },
-    { id: "comisiones", title: "Comisiones", desc: "Liquidación por %", icon: <Calculator size={28} />, bg: "var(--purple-pastel-soft)", color: "var(--purple-dark)", roles: ["administrador", "recepcionista"] },
+    { id: "comisiones", title: "Comisiones", desc: "Liquidación por %", icon: <Calculator size={28} />, bg: "var(--purple-pastel-soft)", color: "var(--purple-dark)", roles: ["administrador"] },
     { id: "ajustes", title: "Ajustes", desc: "Usuarios y tarifas", icon: <Settings size={28} />, bg: "var(--pink-pastel-soft)", color: "var(--pink-dark)", roles: ["administrador", "recepcionista"] },
-    { id: "nomina_rrhh", title: "Recursos Humanos", desc: "Nómina y Asistencia", icon: <Briefcase size={28} />, bg: "var(--purple-pastel-soft)", color: "var(--purple-dark)", roles: ["administrador"] }
+    { id: "nomina_rrhh", title: "Recursos Humanos", desc: "Nómina y Asistencia", icon: <Briefcase size={28} />, bg: "var(--purple-pastel-soft)", color: "var(--purple-dark)", roles: ["administrador"] },
+    { id: "auditoria", title: "Auditoría de Actividades", desc: "Historial y logs de cambios", icon: <Shield size={28} />, bg: "var(--pink-pastel-soft)", color: "var(--pink-dark)", roles: ["administrador"] }
   ];
 
-  const visibleApps = appModules.filter(app => 
-    app.id !== "nomina_rrhh" && 
-    app.roles.includes(currentUser.rol)
-  );
+  const visibleApps = appModules.filter(app => {
+    // Basic role check
+    if (!app.roles.includes(currentUser.rol)) return false;
+    
+    // Hide nomina_rrhh from launchpad since it's accessed via the Directory Selector
+    if (app.id === "nomina_rrhh") return false;
+    
+    // Jeni is administrator, but only sees auditing/financial/concrete modules
+    if (isJeni) {
+      const jeniApps = ["dashboard_finanzas", "caja", "evaluaciones", "ajustes", "auditoria"];
+      return jeniApps.includes(app.id);
+    }
+    
+    return true;
+  });
 
   const renderActiveApp = () => {
     switch (activeApp) {
@@ -341,10 +690,15 @@ function MainDashboard() {
       case "caja": return <CajaApp />;
       case "evaluaciones": return <EvaluacionesApp />;
       case "tareas": return <TareasApp />;
-      case "comisiones": return <ComisionesApp />;
+      case "comisiones": 
+        if (currentUser?.rol !== "administrador") return <div style={{ padding: "40px", textAlign: "center", color: "var(--pink-dark)", fontWeight: "bold" }}>Acceso Denegado</div>;
+        return <ComisionesApp />;
       case "ajustes": return <AjustesApp />;
       case "dashboard_finanzas": return <FinanzasDashboardApp />;
       case "nomina_rrhh": return <NominaRrhhApp />;
+      case "auditoria":
+        if (currentUser?.rol !== "administrador") return <div style={{ padding: "40px", textAlign: "center", color: "var(--pink-dark)", fontWeight: "bold" }}>Acceso Denegado</div>;
+        return <AuditoriaApp />;
       default: return null;
     }
   };
@@ -352,6 +706,40 @@ function MainDashboard() {
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       
+      {/* Holiday / Event Alarm Banner Alert */}
+      {activeHolidayAlert && (
+        <div style={{
+          backgroundColor: activeHolidayAlert.tipo === "feriado" ? "#FCE8E6" : "#F5F3FF", 
+          color: activeHolidayAlert.tipo === "feriado" ? "#A8200D" : "#5B21B6", 
+          padding: "14px 20px", display: "flex",
+          justifyContent: "space-between", alignItems: "center", 
+          borderBottom: `2px solid ${activeHolidayAlert.tipo === "feriado" ? "#F3A094" : "#DDD6FE"}`,
+          fontSize: "0.9rem", fontWeight: "bold", gap: "10px", 
+          animation: "pulseSoft 2s infinite"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <AlertTriangle size={20} className="shake" />
+            <span>
+              ⏰ ¡ALERTA RECEPCIÓN! Se aproxima el {activeHolidayAlert.tipo === "feriado" ? "FERIADO" : "EVENTO"} "{activeHolidayAlert.titulo}" en {activeHolidayAlert.daysLeft} días ({activeHolidayAlert.fechaStr}).
+            </span>
+          </div>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => { 
+              setSilencedAlerts(prev => ({ ...prev, [activeHolidayAlert.key]: true }));
+            }} 
+            style={{ 
+              padding: "6px 14px", 
+              fontSize: "0.8rem", 
+              backgroundColor: activeHolidayAlert.tipo === "feriado" ? "#A8200D" : "var(--purple-dark)",
+              border: "none"
+            }}
+          >
+            Apagar Alarma
+          </button>
+        </div>
+      )}
+
       {/* 3:00 PM Alarm Banner Alert */}
       {show4pmAlarm && (
         <div style={{
@@ -361,7 +749,9 @@ function MainDashboard() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <Bell size={20} className="shake" />
-            <span>⏰ ¡ALERTA RECEPCIÓN! Son las 3:00 PM o más. Recuerda enviar los recordatorios de citas de mañana por WhatsApp.</span>
+            <span>
+              ⏰ ¡ALERTA RECEPCIÓN! Recuerda enviar los recordatorios de citas de mañana por WhatsApp.
+            </span>
           </div>
           <button className="btn btn-primary" onClick={() => { setActiveApp("recordatorios"); setShow4pmAlarm(false); }} style={{ padding: "6px 14px", fontSize: "0.8rem", backgroundColor: "#A8200D" }}>
             Enviar Ahora
@@ -384,12 +774,44 @@ function MainDashboard() {
           </button>
         </div>
       )}
+
+      {/* Friday Backup Weekly Banner Alert */}
+      {(isAdmin || currentUser?.rol === "recepcionista") && new Date().getDay() === 5 && !fridayBackupDismissed && (
+        <div style={{
+          backgroundColor: "#EEF2F6", color: "#1E3A8A", padding: "14px 20px", display: "flex",
+          justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #BFDBFE",
+          fontSize: "0.9rem", fontWeight: "bold", gap: "10px"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Database size={20} className="shake" color="#1E3A8A" />
+            <span>💾 ¡VIERNES DE RESPALDO! Por favor, descarga tu copia de seguridad semanal para mantener los datos de la clínica a salvo.</span>
+          </div>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button 
+              className="btn btn-primary" 
+              disabled={isExportingWeekly}
+              onClick={handleFridayBackup} 
+              style={{ padding: "6px 14px", fontSize: "0.8rem", backgroundColor: "#1E3A8A", border: "none" }}
+            >
+              {isExportingWeekly ? "Descargando..." : "Descargar Ahora"}
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={dismissFridayAlert} 
+              style={{ padding: "6px 14px", fontSize: "0.8rem", border: "1px solid #1E3A8A", color: "#1E3A8A" }}
+            >
+              Omitir Hoy
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header bar */}
       <header className="glass header-responsive" style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
         padding: "14px 30px", borderBottom: "1px solid var(--border-light)", zIndex: 10
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer" }} onClick={() => { setActiveApp("launchpad"); if (currentUser?.email === "toño@gmail.com") setMainView("top"); }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer" }} onClick={() => { setActiveApp("launchpad"); if (isTono) setMainView("top"); }}>
           <div style={{
             display: "inline-flex", padding: "8px", borderRadius: "50%",
             background: "linear-gradient(135deg, var(--purple-pastel-soft) 0%, var(--pink-pastel-soft) 100%)",
@@ -401,12 +823,12 @@ function MainDashboard() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          {(activeApp !== "launchpad" || mainView !== "top") && (
+          {(activeApp !== "launchpad" || (isTono && mainView !== "top")) && (
             <button 
               className="btn btn-secondary" 
               onClick={() => {
                 setActiveApp("launchpad");
-                if (currentUser?.email === "toño@gmail.com") {
+                if (isTono) {
                   setMainView("top");
                 }
               }}
@@ -445,7 +867,7 @@ function MainDashboard() {
       {/* Main app body */}
       <main style={{ flex: 1, padding: "20px", display: "flex", flexDirection: "column" }}>
         {activeApp === "launchpad" ? (
-          currentUser?.email === "toño@gmail.com" && mainView === "top" ? (
+          isTono && mainView === "top" ? (
             /* Toño Directory Selector (Administración vs. Recursos Humanos) */
             <div className="fade-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "40px 0" }}>
               <h2 style={{ fontSize: "2rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "12px", letterSpacing: "-0.5px" }}>
@@ -540,10 +962,20 @@ function MainDashboard() {
             </div>
           ) : (
             /* Odoo Launchpad App grid view */
-            <div className="fade-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "40px 0" }}>
-              <h2 style={{ fontSize: "2rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "32px", letterSpacing: "-0.5px" }}>
+            <div className="fade-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "40px 0", width: "100%" }}>
+              <h2 style={{ fontSize: "2rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "32px", letterSpacing: "-0.5px", textAlign: "center" }}>
                 Hola, {currentUser.nombre.split(" ")[0]} 👋
               </h2>
+              
+              {isAdmin && (
+                <AlertasCriticasPanel 
+                  citas={citas} 
+                  evaluaciones={evaluaciones}
+                  transacciones={transacciones}
+                  auditorias={auditorias}
+                  onNavigate={setActiveApp}
+                />
+              )}
               <div className="responsive-grid" style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",

@@ -177,6 +177,26 @@ button, input, select, textarea {
 }
 
 @media (max-width: 768px) {
+  /* Contención global del layout en móviles para evitar scroll horizontal en body */
+  body,
+  html,
+  #root,
+  main,
+  main > .glass {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Prevenir que los hijos de grids/flexes fuercen la expansión en móviles */
+  .responsive-grid > *,
+  .responsive-flex > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
   .responsive-grid {
     grid-template-columns: 1fr !important;
     gap: 12px !important;
@@ -186,6 +206,37 @@ button, input, select, textarea {
     flex-direction: column !important;
     gap: 10px !important;
     align-items: stretch !important;
+  }
+
+  /* Forzar anchos dinámicos del 100% en elementos de filtros flex */
+  .responsive-flex > div,
+  .responsive-flex > select,
+  .responsive-flex > input,
+  .responsive-flex > button {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Forzar contención y desplazamiento local de las tablas responsivas */
+  .responsive-table-wrap {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    display: block !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Scrollbar horizontal fino y premium para tablas en teléfonos */
+  .responsive-table-wrap::-webkit-scrollbar {
+    height: 4px !important;
+  }
+  .responsive-table-wrap::-webkit-scrollbar-track {
+    background: transparent !important;
+  }
+  .responsive-table-wrap::-webkit-scrollbar-thumb {
+    background: var(--purple-pastel-soft) !important;
+    border-radius: 2px !important;
   }
 
   .header-responsive {
@@ -231,6 +282,102 @@ button, input, select, textarea {
     border-bottom: 1px solid var(--border-light);
     padding-bottom: 15px;
   }
+
+  /* --- STACKED CARDS FOR TABLES ON MOBILE (NO SIDE SCROLL) --- */
+
+  /* 1. MÓDULO DE PACIENTES */
+  .pacientes-app .responsive-table-wrap thead {
+    display: none !important;
+  }
+  .pacientes-app .responsive-table-wrap table,
+  .pacientes-app .responsive-table-wrap tbody,
+  .pacientes-app .responsive-table-wrap tr {
+    display: block !important;
+    width: 100% !important;
+  }
+  .pacientes-app .responsive-table-wrap tr {
+    margin-bottom: 16px !important;
+    padding: 12px !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius-md) !important;
+    background: white !important;
+    box-shadow: var(--shadow-sm) !important;
+  }
+  .pacientes-app .responsive-table-wrap td {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    padding: 8px 0 !important;
+    border-bottom: 1px dashed var(--border-soft) !important;
+    font-size: 0.85rem !important;
+    box-sizing: border-box !important;
+    min-height: 40px !important;
+    text-align: right !important;
+  }
+  .pacientes-app .responsive-table-wrap td:last-child {
+    border-bottom: none !important;
+    justify-content: flex-end !important;
+  }
+  .pacientes-app .responsive-table-wrap td::before {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    text-align: left !important;
+  }
+  .pacientes-app .responsive-table-wrap td:nth-child(1)::before { content: "Niño:"; }
+  .pacientes-app .responsive-table-wrap td:nth-child(2)::before { content: "Cédula:"; }
+  .pacientes-app .responsive-table-wrap td:nth-child(3)::before { content: "Edad:"; }
+  .pacientes-app .responsive-table-wrap td:nth-child(4)::before { content: "Representante:"; }
+  .pacientes-app .responsive-table-wrap td:nth-child(5)::before { content: "Estado:"; }
+
+  /* 2. MÓDULO DE COLABORADORES (RECURSOS HUMANOS) */
+  .nomina-app .responsive-table-wrap thead {
+    display: none !important;
+  }
+  .nomina-app .responsive-table-wrap table,
+  .nomina-app .responsive-table-wrap tbody,
+  .nomina-app .responsive-table-wrap tr {
+    display: block !important;
+    width: 100% !important;
+  }
+  .nomina-app .responsive-table-wrap tr {
+    margin-bottom: 16px !important;
+    padding: 12px !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius-md) !important;
+    background: white !important;
+    box-shadow: var(--shadow-sm) !important;
+  }
+  .nomina-app .responsive-table-wrap td {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    padding: 8px 0 !important;
+    border-bottom: 1px dashed var(--border-soft) !important;
+    font-size: 0.85rem !important;
+    box-sizing: border-box !important;
+    min-height: 40px !important;
+    text-align: right !important;
+  }
+  .nomina-app .responsive-table-wrap td:last-child {
+    border-bottom: none !important;
+    justify-content: flex-end !important;
+  }
+  .nomina-app .responsive-table-wrap td::before {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    text-align: left !important;
+  }
+  .nomina-app .responsive-table-wrap td:nth-child(1)::before { content: "Colaborador:"; }
+  .nomina-app .responsive-table-wrap td:nth-child(2)::before { content: "Cargo/Puesto:"; }
+  .nomina-app .responsive-table-wrap td:nth-child(3)::before { content: "Sueldo Base:"; }
+  .nomina-app .responsive-table-wrap td:nth-child(4)::before { content: "Fecha Ingreso:"; }
+  .nomina-app .responsive-table-wrap td:nth-child(5)::before { content: "Estado:"; }
 }
 
 .period-col-left {
@@ -273,8 +420,21 @@ button, input, select, textarea {
   select, 
   label,
   form,
-  .glass:not(.print-area) {
+  .no-print {
     display: none !important;
+  }
+
+  /* Only hide non-printable glass panels if there is a specific print-area container on the page */
+  body:has(.print-area) .glass:not(.print-area) {
+    display: none !important;
+  }
+
+  /* Optimize glass panels for print by removing backgrounds, shadows, and backdrop filters */
+  .glass {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
   }
 
   /* Reset outer layout wrappers to let the printable content expand fully */
@@ -324,5 +484,115 @@ button, input, select, textarea {
     padding: 8px !important;
   }
 }
+
+/* Administrative Critical Alerts Panel styles */
+.alerts-panel {
+  border-left: 5px solid #EF4444;
+  border-image: linear-gradient(to bottom, #EF4444, #F59E0B) 1 100%;
+  background: rgba(254, 242, 242, 0.6);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  width: 100%;
+  max-width: 800px;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.05), 0 4px 6px -4px rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-left-width: 5px;
+}
+
+.alerts-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: #991B1B;
+}
+
+.alerts-panel-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.3px;
+}
+
+.alerts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.alert-card {
+  background: white;
+  border: 1px solid rgba(239, 68, 68, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.alert-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+  border-color: rgba(239, 68, 68, 0.25);
+  background: #FFF5F5;
+}
+
+.alert-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.alert-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.alert-card-count {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #991B1B;
+}
+
+.alert-card-label {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.pulse-glow {
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+  animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+/* Custom hover color for calendar grid cells */
+.table-cell-hover:hover {
+  background-color: #F3E8FF !important;
+}
+
 
 

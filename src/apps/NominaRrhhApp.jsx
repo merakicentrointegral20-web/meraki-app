@@ -397,6 +397,10 @@ export default function NominaRrhhApp() {
   // --- 7. PRINTING HELPERS ---
   const printPopup = (html) => {
     const w = window.open("", "_blank");
+    if (!w) {
+      alert("⚠️ El navegador bloqueó la ventana emergente de impresión. Por favor, habilita las ventanas emergentes (popups) para este sitio en la configuración de tu navegador para poder imprimir.");
+      return;
+    }
     const docHtml = `
       <!DOCTYPE html>
       <html>
@@ -724,7 +728,7 @@ export default function NominaRrhhApp() {
   }, [bonosExtras, nominaMonth, nominaYear]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
+    <div className="nomina-app" style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
       {/* Sub header for HR navigation */}
       <div className="glass" style={{ display: "flex", gap: "10px", padding: "10px 20px", borderBottom: "1px solid var(--border-light)", flexWrap: "wrap" }}>
         <button className="btn" style={{ backgroundColor: activeTab === "dashboard" ? "var(--purple-light)" : "transparent", color: activeTab === "dashboard" ? "var(--purple-dark)" : "var(--text-muted)" }} onClick={() => setActiveTab("dashboard")}>
@@ -817,7 +821,7 @@ export default function NominaRrhhApp() {
         {/* --- 2. TAB: EMPLEADOS --- */}
         {activeTab === "empleados" && (
           <div className="fade-in">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div className="responsive-flex" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div>
                 <h3 style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--purple-dark)" }}>Directorio de Colaboradores</h3>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>Agregar o modificar datos salariales y cuentas bancarias.</p>
@@ -1048,7 +1052,7 @@ export default function NominaRrhhApp() {
         {/* --- 4. TAB: ROL DE PAGOS --- */}
         {activeTab === "nomina" && (
           <div className="fade-in">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div className="responsive-flex" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div>
                 <h3 style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--purple-dark)" }}>Cálculo y Roles de Pago</h3>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>Mes de Liquidación: <strong>{MN[nominaMonth]} {nominaYear}</strong></p>
@@ -1249,7 +1253,7 @@ export default function NominaRrhhApp() {
         {/* --- 5. TAB: FERIADOS --- */}
         {activeTab === "feriados" && (
           <div className="fade-in">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div className="responsive-flex" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div>
                 <h3 style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--purple-dark)" }}>Feriados y Descansos Especiales</h3>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>Registrar feriados locales o nacionales para el cálculo automático de marcaciones.</p>
@@ -1309,7 +1313,7 @@ export default function NominaRrhhApp() {
               {empForm.id ? "Editar Colaborador" : "Registrar Nuevo Colaborador"}
             </h4>
             <form onSubmit={handleSaveEmp}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+              <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                 <div>
                   <label style={{ fontSize: "0.75rem", fontWeight: 600, display: "block", marginBottom: "4px" }}>Nombres Completos*</label>
                   <input type="text" required placeholder="APELLIDOS NOMBRES" className="input-field" value={empForm.nombres} onChange={(e) => setEmpForm({...empForm, nombres: e.target.value})} />
@@ -1319,7 +1323,7 @@ export default function NominaRrhhApp() {
                   <input type="text" required maxLength={10} placeholder="Ej. 0102030405" className="input-field" value={empForm.cedula} onChange={(e) => setEmpForm({...empForm, cedula: e.target.value})} />
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+              <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                 <div>
                   <label style={{ fontSize: "0.75rem", fontWeight: 600, display: "block", marginBottom: "4px" }}>Cargo / Puesto*</label>
                   <input type="text" required placeholder="Ej. Auxiliar General" className="input-field" value={empForm.cargo} onChange={(e) => setEmpForm({...empForm, cargo: e.target.value})} />
@@ -1329,7 +1333,7 @@ export default function NominaRrhhApp() {
                   <input type="number" step="0.01" min="0" required placeholder="Ej. 460" className="input-field" value={empForm.sueldo} onChange={(e) => setEmpForm({...empForm, sueldo: e.target.value})} />
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+              <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                 <div>
                   <label style={{ fontSize: "0.75rem", fontWeight: 600, display: "block", marginBottom: "4px" }}>Fecha de Ingreso*</label>
                   <input type="date" required className="input-field" value={empForm.ingreso} onChange={(e) => setEmpForm({...empForm, ingreso: e.target.value})} />
@@ -1342,7 +1346,7 @@ export default function NominaRrhhApp() {
                   </select>
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+              <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                 <div>
                   <label style={{ fontSize: "0.75rem", fontWeight: 600, display: "block", marginBottom: "4px" }}>Nro. Cuenta Bancaria</label>
                   <input type="text" placeholder="Ej. 10203040" className="input-field" value={empForm.cuenta} onChange={(e) => setEmpForm({...empForm, cuenta: e.target.value})} />
@@ -1375,7 +1379,7 @@ export default function NominaRrhhApp() {
           <div className="glass fade-in" style={{ backgroundColor: "white", padding: "24px", borderRadius: "var(--radius-lg)", width: "90%", maxWidth: "450px" }}>
             <h4 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--purple-dark)", marginBottom: "16px" }}>Registrar Novedad Asistencia</h4>
             <form onSubmit={handleSaveNov}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+              <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                 <div>
                   <label style={{ fontSize: "0.75rem", fontWeight: 600, display: "block", marginBottom: "4px" }}>Colaborador</label>
                   <select className="input-field" value={novForm.empId} onChange={(e) => setNovForm({...novForm, empId: e.target.value})}>
@@ -1398,7 +1402,7 @@ export default function NominaRrhhApp() {
                   </select>
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+              <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                 <div>
                   <label style={{ fontSize: "0.75rem", fontWeight: 600, display: "block", marginBottom: "4px" }}>Fecha Inicio</label>
                   <input type="date" required className="input-field" value={novForm.ini} onChange={(e) => setNovForm({...novForm, ini: e.target.value})} />
@@ -1432,7 +1436,7 @@ export default function NominaRrhhApp() {
                 <label style={{ fontSize: "0.75rem", fontWeight: 600, display: "block", marginBottom: "4px" }}>Nombre del Feriado</label>
                 <input type="text" required placeholder="Ej. Año Nuevo, Independencia" className="input-field" value={ferForm.nombre} onChange={(e) => setFerForm({...ferForm, nombre: e.target.value})} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+              <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
                 <div>
                   <label style={{ fontSize: "0.75rem", fontWeight: 600, display: "block", marginBottom: "4px" }}>Fecha</label>
                   <input type="date" required className="input-field" value={ferForm.fecha} onChange={(e) => setFerForm({...ferForm, fecha: e.target.value})} />

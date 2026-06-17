@@ -9,6 +9,38 @@ const getLocalDateString = (date) => {
   return `${y}-${m}-${d}`;
 };
 
+const formatTargetDateLabel = (dateStr) => {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dateObj = new Date(y, m - 1, d);
+  const dayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  return `${dayNames[dateObj.getDay()]}, ${dateObj.getDate()} de ${monthNames[dateObj.getMonth()]}`;
+};
+
+const getWeeklyTargetMonday = (dateObj) => {
+  const day = dateObj.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const d = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  
+  // Calculate Monday of the selected date's week:
+  const daysToSub = day === 0 ? 6 : day - 1;
+  d.setDate(d.getDate() - daysToSub);
+  
+  // If the selected date is Thursday, Friday, Saturday, or Sunday, we want NEXT week's Monday (add 7 days):
+  if (day === 0 || day >= 4) {
+    d.setDate(d.getDate() + 7);
+  }
+  return d;
+};
+
+const getMondayOfDate = (dateObj) => {
+  const day = dateObj.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const d = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  const daysToSub = day === 0 ? 6 : day - 1;
+  d.setDate(d.getDate() - daysToSub);
+  return d;
+};
+
 export default function RecordatoriosApp() {
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
@@ -16,11 +48,22 @@ export default function RecordatoriosApp() {
   const [recordatoriosEnviados, setRecordatoriosEnviados] = useState({}); // { [date]: { [patientId]: true } }
   
   // Tab states: 'diario' | 'semanal'
-  const [activeTab, setActiveTab] = useState("diario");
+  const activeTab = "diario";
   const [targetDate, setTargetDate] = useState("");
   
   // Weekly batch states
   const [selectedWeekStart, setSelectedWeekStart] = useState("");
+
+  const todayObj = new Date();
+  const currentMonday = getMondayOfDate(todayObj);
+  const nextMonday = new Date(currentMonday);
+  nextMonday.setDate(nextMonday.getDate() + 7);
+
+  const formatMondayLabel = (mondayObj) => {
+    const d = String(mondayObj.getDate()).padStart(2, '0');
+    const m = String(mondayObj.getMonth() + 1).padStart(2, '0');
+    return `${d}/${m}`;
+  };
   
   // Assistant states
   const [assistantActive, setAssistantActive] = useState(false);
@@ -28,47 +71,85 @@ export default function RecordatoriosApp() {
   const [assistantQueue, setAssistantQueue] = useState([]);
   const [countdown, setCountdown] = useState(0);
 
-  const [isDateManuallyChanged, setIsDateManuallyChanged] = useState(false);
+  // Set automatic daily date based on today's day of week and scheduled Saturday appointments
+  useEffect(() => {
+    if (citas.length === 0) return;
+    
+    const calculateTargetDate = (citasList) => {
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      
+      const getLocalDateString = (date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+
+      let target = new Date();
+      
+      if (dayOfWeek === 5) {
+        // Today is Friday. Check if Saturday has appointments.
+        const sat = new Date(today);
+        sat.setDate(today.getDate() + 1);
+        const satStr = getLocalDateString(sat);
+        const hasSatAppointments = citasList.some(c => c.fecha === satStr && c.estadoAsistencia !== "falto_justificado");
+        
+        if (hasSatAppointments) {
+          target.setDate(today.getDate() + 1); // Saturday
+        } else {
+          target.setDate(today.getDate() + 3); // Monday
+        }
+      } else if (dayOfWeek === 6) {
+        // Today is Saturday. Target is Monday.
+        target.setDate(today.getDate() + 2); // Monday
+      } else if (dayOfWeek === 0) {
+        // Today is Sunday. Target is Monday.
+        target.setDate(today.getDate() + 1); // Monday
+      } else {
+        // Today is Mon, Tue, Wed, Thu. Target is tomorrow.
+        target.setDate(today.getDate() + 1);
+      }
+      
+      return getLocalDateString(target);
+    };
+
+    const dateStr = calculateTargetDate(citas);
+    setTargetDate(dateStr);
+  }, [citas]);
 
   // Set default weekly date on load, and load saved state
   useEffect(() => {
-    // Next Monday for weekly tab
     const today = new Date();
-    const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1) + 7; // Monday of next week
-    const nextMonday = new Date(today.setDate(diff));
-    setSelectedWeekStart(getLocalDateString(nextMonday));
+    const targetMonday = getWeeklyTargetMonday(today);
+    setSelectedWeekStart(getLocalDateString(targetMonday));
     
     // Load sent recordatorios state from localstorage
-    const saved = localStorage.getItem("meraki_sent_recordatorios");
-    if (saved) {
-      setRecordatoriosEnviados(JSON.parse(saved));
-    }
-  }, []);
-
-  // Set default daily date to next day with scheduled appointments
-  useEffect(() => {
-    if (citas.length === 0 || isDateManuallyChanged) return;
-
-    const target = new Date();
-    target.setDate(target.getDate() + 1); // Mañana
-    
-    // Buscamos en los próximos 7 días para encontrar el primer día que tenga citas programadas
-    for (let i = 0; i < 7; i++) {
-      const dateStr = getLocalDateString(target);
-      const hasCitas = citas.some(c => c.fecha === dateStr && c.estadoAsistencia !== "falto_justificado");
-      if (hasCitas) {
-        setTargetDate(dateStr);
-        return;
+    const loadState = () => {
+      const saved = localStorage.getItem("meraki_sent_recordatorios");
+      if (saved) {
+        setRecordatoriosEnviados(JSON.parse(saved));
+      } else {
+        setRecordatoriosEnviados({});
       }
-      target.setDate(target.getDate() + 1);
-    }
-    
-    // Si no hay citas programadas en los próximos 7 días, por defecto dejamos mañana
-    const defaultTomorrow = new Date();
-    defaultTomorrow.setDate(defaultTomorrow.getDate() + 1);
-    setTargetDate(getLocalDateString(defaultTomorrow));
-  }, [citas, isDateManuallyChanged]);
+    };
+    loadState();
+
+    const handleStorageChange = (e) => {
+      if (e.key === "meraki_sent_recordatorios") {
+        loadState();
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
+    const handleFocus = () => loadState();
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
 
   useEffect(() => {
     const unsubCitas = subscribeToCollection("citas", setCitas);
@@ -131,7 +212,7 @@ export default function RecordatoriosApp() {
     if (!selectedWeekStart) return [];
     const [year, month, day] = selectedWeekStart.split("-").map(Number);
     const dates = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       const d = new Date(year, month - 1, day + i);
       dates.push(getLocalDateString(d));
     }
@@ -174,7 +255,7 @@ export default function RecordatoriosApp() {
     return Object.values(grouped);
   };
 
-  const DAYS_SHORT = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const DAYS_SHORT = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
   // Message formatters
   const getDailyMessage = (item) => {
@@ -228,7 +309,7 @@ export default function RecordatoriosApp() {
     });
 
     return `¡Hola *${item.representante.toUpperCase()}*! 👋\n\n` +
-           `Te recordamos la cita de *${item.pacienteNombre.toUpperCase()}* en *MERAKI* 🧘‍♀️ para las siguientes citas:\n` +
+           `Te recordamos las sesiones programadas para *${item.pacienteNombre.toUpperCase()}* en *MERAKI* 🧘‍♀️:\n` +
            `${citasText}\n` +
            `Por favor, llega *a tiempo* ⏳ para asegurar su atención. Según nuestras políticas, la inasistencia podría resultar en la *pérdida de su turno* y la necesidad de cancelarlo. Si surge alguna enfermedad o calamidad, te pedimos *justificarla con pruebas documentales* 📝, las cuales serán revisadas por nuestra administración.\n\n` +
            `¡Te esperamos en *MERAKI*! ✨📌 Importante: Al no recibir respuesta a este mensaje, se asume que el horario ha sido aceptado. En caso de requerir reprogramación, es necesario notificar inmediatamente al momento de recibir el horario.`;
@@ -309,8 +390,9 @@ export default function RecordatoriosApp() {
     
     sendWhatsApp(item.telefono, msg, item.pacienteId, dateKey);
 
-    // If there is a next one, set countdown to delay security click
+    // If there is a next one, set countdown to delay security click and advance
     if (currentAssistantIdx < assistantQueue.length - 1) {
+      setCurrentAssistantIdx(currentAssistantIdx + 1);
       setCountdown(4); // 4 seconds delay before allowing next click to prevent WhatsApp detection
     } else {
       setAssistantActive(false);
@@ -343,33 +425,22 @@ export default function RecordatoriosApp() {
         </div>
 
         <div style={{ display: "flex", gap: "10px" }}>
-          {activeTab === "diario" ? (
-            <input 
-              type="date" 
-              className="input-field" 
-              style={{ width: "160px" }}
-              value={targetDate}
-              onChange={(e) => {
-                setTargetDate(e.target.value);
-                setIsDateManuallyChanged(true);
-              }}
-            />
-          ) : (
-            <input 
-              type="date" 
-              className="input-field" 
-              style={{ width: "160px" }}
-              value={selectedWeekStart}
-              onChange={(e) => {
-                const [y, m, d] = e.target.value.split("-").map(Number);
-                const selected = new Date(y, m - 1, d);
-                const day = selected.getDay();
-                const diff = selected.getDate() - day + (day === 0 ? -6 : 1);
-                const nextMonday = new Date(selected.setDate(diff));
-                setSelectedWeekStart(getLocalDateString(nextMonday));
-              }}
-            />
-          )}
+          <div style={{
+            padding: "8px 16px",
+            backgroundColor: "white",
+            borderRadius: "var(--radius-sm)",
+            border: "1px solid var(--border-light)",
+            fontSize: "0.9rem",
+            fontWeight: "600",
+            color: "var(--purple-dark)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            boxShadow: "var(--shadow-xs)"
+          }}>
+            <Calendar size={16} />
+            <span>Recordatorios para: {formatTargetDateLabel(targetDate)}</span>
+          </div>
           <button 
             className="btn btn-primary"
             onClick={() => startAssistant(currentQueue.filter(item => !recordatoriosEnviados[currentDateKey]?.[item.pacienteId]))}
@@ -389,37 +460,7 @@ export default function RecordatoriosApp() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "12px", borderBottom: "2px solid var(--border-light)", marginBottom: "20px" }}>
-        <button 
-          onClick={() => {
-            setActiveTab("diario");
-            setIsDateManuallyChanged(false);
-          }}
-          style={{
-            padding: "10px 20px", border: "none", background: "none", fontWeight: 500, cursor: "pointer",
-            borderBottom: activeTab === "diario" ? "3px solid var(--purple-base)" : "3px solid transparent",
-            color: activeTab === "diario" ? "var(--purple-dark)" : "var(--text-muted)"
-          }}
-        >
-          <MessageSquare size={16} style={{ marginRight: "6px", display: "inline-flex", verticalAlign: "middle" }} />
-          Recordatorios Diarios (1 Día Antes)
-        </button>
-        <button 
-          onClick={() => {
-            setActiveTab("semanal");
-            setIsDateManuallyChanged(false);
-          }}
-          style={{
-            padding: "10px 20px", border: "none", background: "none", fontWeight: 500, cursor: "pointer",
-            borderBottom: activeTab === "semanal" ? "3px solid var(--purple-base)" : "3px solid transparent",
-            color: activeTab === "semanal" ? "var(--purple-dark)" : "var(--text-muted)"
-          }}
-        >
-          <Calendar size={16} style={{ marginRight: "6px", display: "inline-flex", verticalAlign: "middle" }} />
-          Agenda Semanal de Citas (Cierre de los Viernes)
-        </button>
-      </div>
+
 
       {/* Alerta de Salto de Agenda (para días no laborables o sin citas) */}
       {activeTab === "diario" && getIsSkippedDate() && (
